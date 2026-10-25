@@ -1,0 +1,32 @@
+**/bin/
+**/obj/
+.vs/
+TestResults/
+*.user
+*.log
+SaoLuu/
+
+# Ban chay, goi nen va du lieu chi dung tren may ca nhan
+/BanChay/
+/BanGiao/
+*.mdf
+*.ndf
+*.ldf
+*.bak
+*.zip
+*.pfx
+*.p12
+.env
+.env.*
+
+# Thu muc cu do Visual Studio tao lai sau khi doi ten du an
+/src/
+/tests/
+
+# Chi dua anh minh hoa va cau truc du lieu vao repository
+/KetQua/*
+!/KetQua/GiaoDien/
+/KetQua/GiaoDien/*
+!/KetQua/GiaoDien/*.png
+!/KetQua/CauTrucDuLieu.json
+__pycache__/

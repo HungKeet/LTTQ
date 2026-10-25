@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><RootNamespace>Hotel.WinForms</RootNamespace><OutputType>WinExe</OutputType><TargetFramework>net10.0-windows</TargetFramework><UseWindowsForms>true</UseWindowsForms><AssemblyName>QuanLyKhachSan</AssemblyName><ApplicationManifest>UngDung.manifest</ApplicationManifest><ApplicationHighDpiMode>DpiUnawareGdiScaled</ApplicationHighDpiMode></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../NghiepVu/NghiepVu.csproj" /></ItemGroup>
+  <ItemGroup><None Include="CauHinh.json" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
+</Project>

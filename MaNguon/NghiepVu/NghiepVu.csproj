@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><RootNamespace>Hotel.Business</RootNamespace><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../MoHinh/MoHinh.csproj" /><ProjectReference Include="../DuLieu/DuLieu.csproj" /></ItemGroup>
+</Project>

@@ -1,0 +1,6 @@
+{
+  "ConnectionString": "Server=lpc:.\\SQLEXPRESS;Database=HotelManagementBTL;Integrated Security=True;TrustServerCertificate=True;Connect Timeout=15",
+  "HotelName": "KHÁCH SẠN NGỌC KHOA",
+  "HotelAddress": "Địa chỉ khách sạn mẫu • Hà Nội",
+  "HotelPhone": "024 0000 0000"
+}
