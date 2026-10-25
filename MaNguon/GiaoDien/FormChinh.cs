@@ -74,63 +74,48 @@ internal sealed class MainForm : Form
 
 
 
-        // 1. Quản lý phòng
-
+        // 1. Quản lý phòng & Đặt phòng
         var dashboard = new DashboardPage(service, user);
-
         Page("Sơ đồ phòng", dashboard, dashboard.RefreshData);
 
-        var roomsPage = new CatalogPage(service, user, CatalogKind.Rooms);
+        var bookings = new BookingsPage(service, user, settings);
+        Page("Quản lý đặt phòng", bookings, bookings.RefreshData);
 
+        var roomsPage = new CatalogPage(service, user, CatalogKind.Rooms);
         Page("Quản lý phòng", roomsPage, roomsPage.RefreshData);
 
         var roomTypesPage = new CatalogPage(service, user, CatalogKind.RoomTypes);
-
         Page("Loại phòng & Giá", roomTypesPage, roomTypesPage.RefreshData);
 
+        var customersPage = new CatalogPage(service, user, CatalogKind.Customers);
+        Page("Khách hàng", customersPage, customersPage.RefreshData);
 
+        var servicesPage = new CatalogPage(service, user, CatalogKind.Services);
+        Page("Dịch vụ", servicesPage, servicesPage.RefreshData);
 
         // 2. Quản lý hóa đơn
-
         var invoices = new InvoicesPage(service, user, settings);
-
         Page("Quản lý hóa đơn", invoices, invoices.RefreshData);
 
+        // 3. Quản lý doanh thu & Hệ thống (Dành cho Quản lý)
+        if (user.Role == "Quản lý")
+        {
+            var reports = new ReportsPage(service, user);
+            Page("Báo cáo doanh thu", reports, reports.RefreshData);
 
+            var usersPage = new CatalogPage(service, user, CatalogKind.Users);
+            Page("Quản lý tài khoản", usersPage, usersPage.RefreshData);
 
-        // 3. Quản lý doanh thu (Biểu đồ cột & Bảng chi tiết)
+            var employeesPage = new CatalogPage(service, user, CatalogKind.Employees);
+            Page("Nhân viên", employeesPage, employeesPage.RefreshData);
 
-        var reports = new ReportsPage(service, user);
-
-        Page("Báo cáo doanh thu", reports, reports.RefreshData);
-
-
-
-        // 4. Quản lý tài khoản & nhân viên
-
-        var usersPage = new CatalogPage(service, user, CatalogKind.Users);
-
-        Page("Quản lý tài khoản", usersPage, usersPage.RefreshData);
-
-        var employeesPage = new CatalogPage(service, user, CatalogKind.Employees);
-
-        Page("Nhân viên", employeesPage, employeesPage.RefreshData);
-
-
-
-        // 5. Nhật ký kiểm toán
-
-        var auditGrid = Ui.Grid();
-
-        var auditBar = Ui.Toolbar();
-
-        void RefreshAudit() => Ui.Bind(auditGrid, service.AuditHistory(user));
-
-        auditBar.Controls.Add(Ui.Label("500 thao tác gần nhất"));
-
-        auditBar.Controls.Add(Ui.Button("Tải lại", RefreshAudit));
-
-        Page("Nhật ký", Ui.Page(auditGrid, auditBar), RefreshAudit);
+            var auditGrid = Ui.Grid();
+            var auditBar = Ui.Toolbar();
+            void RefreshAudit() => Ui.Bind(auditGrid, service.AuditHistory(user));
+            auditBar.Controls.Add(Ui.Label("500 thao tác gần nhất"));
+            auditBar.Controls.Add(Ui.Button("Tải lại", RefreshAudit));
+            Page("Nhật ký", Ui.Page(auditGrid, auditBar), RefreshAudit);
+        }
 
 
 
