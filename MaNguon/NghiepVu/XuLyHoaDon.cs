@@ -78,6 +78,18 @@ public sealed partial class HotelService
             WHERE i.IssuedAt>=@from AND i.IssuedAt<@to GROUP BY CAST(i.IssuedAt AS date) ORDER BY [Ngày]
             """, ("@from", from.Date), ("@to", to.Date.AddDays(1)));
     }
+    public DataTable MonthlyRevenue(Session user, DateTime from, DateTime to)
+    {
+        if (to.Date < from.Date)
+            throw new ArgumentException("Ngày kết thúc phải bằng hoặc sau ngày bắt đầu.");
+        using var c = db.Open();
+        Authorize(c, null, user, true);
+        return Database.Query(c, null, """
+            SELECT FORMAT(i.IssuedAt, 'MM/yyyy') AS [Tháng],COUNT(*) AS [Số hóa đơn],SUM(x.RoomAmount) AS [Tiền phòng],SUM(x.ServiceAmount) AS [Tiền dịch vụ],SUM(i.Surcharge) AS [Phụ thu],SUM(i.Discount) AS [Giảm giá],SUM(i.Total) AS [Doanh thu],SUM(i.Deposit) AS [Cọc đã đối trừ],SUM(i.Total-i.Deposit) AS [Thu thêm / hoàn âm]
+            FROM Invoices i CROSS APPLY(SELECT COALESCE(SUM(CASE WHEN Kind=N'Phòng' THEN Amount ELSE 0 END),0) RoomAmount,COALESCE(SUM(CASE WHEN Kind=N'Dịch vụ' THEN Amount ELSE 0 END),0) ServiceAmount FROM InvoiceLines WHERE InvoiceId=i.Id) x
+            WHERE i.IssuedAt>=@from AND i.IssuedAt<@to GROUP BY FORMAT(i.IssuedAt, 'yyyy-MM'), FORMAT(i.IssuedAt, 'MM/yyyy') ORDER BY FORMAT(i.IssuedAt, 'yyyy-MM')
+            """, ("@from", from.Date), ("@to", to.Date.AddDays(1)));
+    }
     public DataTable ServiceRevenue(Session user, DateTime from, DateTime to)
     {
         using var c = db.Open();

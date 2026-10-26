@@ -501,7 +501,7 @@ internal sealed class ReportsPage : Panel
 
     private readonly DateTimePicker from = Ui.Date(new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1)), to = Ui.Date(DateTime.Today);
 
-    private readonly ComboBox mode = Ui.Choices("Doanh thu theo ngày", "Doanh thu dịch vụ");
+    private readonly ComboBox mode = Ui.Choices("Doanh thu theo ngày", "Doanh thu theo tháng", "Doanh thu dịch vụ");
 
     private readonly HotelService service; private readonly Session user;
 
@@ -573,53 +573,48 @@ internal sealed class ReportsPage : Panel
 
             throw new ArgumentException("Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.");
 
-        var daily = mode.SelectedIndex == 0;
-
-        var data = daily ? service.Revenue(user, from.Value, to.Value) : service.ServiceRevenue(user, from.Value, to.Value);
-
-        Ui.Bind(grid, data);
-
-        var column = daily ? "Doanh thu" : "Doanh thu dịch vụ";
-
-        var total = data.AsEnumerable().Sum(r => r.Field<decimal>(column));
-
-        summary.Text = $"{column}: {Ui.Currency(total)}\n" + (daily ? "Theo ngày lập hóa đơn đã thanh toán; tiền cọc đã đối trừ, không cộng thêm vào doanh thu." : "Tổng tiền dòng dịch vụ trước giảm giá/phụ thu chung của hóa đơn.");
-
-
-
-        var chartItems = new List<(string Label, decimal Value)>();
-
-        foreach (DataRow row in data.Rows)
-
+        DataTable data;
+        string column;
+        if (mode.SelectedIndex == 0)
         {
-
-            string label;
-
-            if (daily)
-
-            {
-
-                var dt = row.Field<DateTime>("Ngày");
-
-                label = dt.ToString("dd/MM");
-
-            }
-
-            else
-
-            {
-
-                label = row.Field<string>("Dịch vụ") ?? "";
-
-            }
-
-            decimal val = row.Field<decimal>(column);
-
-            chartItems.Add((label, val));
-
+            data = service.Revenue(user, from.Value, to.Value);
+            column = "Doanh thu";
+        }
+        else if (mode.SelectedIndex == 1)
+        {
+            data = service.MonthlyRevenue(user, from.Value, to.Value);
+            column = "Doanh thu";
+        }
+        else
+        {
+            data = service.ServiceRevenue(user, from.Value, to.Value);
+            column = "Doanh thu dịch vụ";
         }
 
-        chart.SetData(chartItems, daily ? "Biểu đồ cột: Doanh thu theo ngày (đ)" : "Biểu đồ cột: Doanh thu theo từng dịch vụ (đ)");
+        Ui.Bind(grid, data);
+        var total = data.AsEnumerable().Sum(r => r.Field<decimal>(column));
+        summary.Text = $"{column}: {Ui.Currency(total)}\n" + (mode.SelectedIndex < 2 ? "Theo ngày/tháng lập hóa đơn đã thanh toán; tiền cọc đã đối trừ, không cộng thêm vào doanh thu." : "Tổng tiền dòng dịch vụ trước giảm giá/phụ thu chung của hóa đơn.");
+
+        var chartItems = new List<(string Label, decimal Value)>();
+        foreach (DataRow row in data.Rows)
+        {
+            string label = mode.SelectedIndex switch
+            {
+                0 => row.Field<DateTime>("Ngày").ToString("dd/MM"),
+                1 => "Tháng " + (row.Field<string>("Tháng") ?? ""),
+                _ => row.Field<string>("Dịch vụ") ?? ""
+            };
+            decimal val = row.Field<decimal>(column);
+            chartItems.Add((label, val));
+        }
+
+        string chartTitle = mode.SelectedIndex switch
+        {
+            0 => "Biểu đồ cột: Doanh thu theo ngày (đ)",
+            1 => "Biểu đồ cột: Doanh thu theo tháng (đ)",
+            _ => "Biểu đồ cột: Doanh thu theo từng dịch vụ (đ)"
+        };
+        chart.SetData(chartItems, chartTitle);
 
     }
 
