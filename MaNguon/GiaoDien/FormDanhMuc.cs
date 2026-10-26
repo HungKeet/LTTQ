@@ -291,7 +291,12 @@ internal sealed class CatalogPage : Panel
 
     }
 
-    public void RefreshData() => Ui.Bind(grid, service.Catalog(user, kind, search.Text));
+    public void RefreshData()
+    {
+        Ui.Bind(grid, service.Catalog(user, kind, search.Text));
+        if (kind == CatalogKind.Rooms && grid.Columns.Contains("Id") && grid.Columns["Id"] is { } colId)
+            colId.Visible = false;
+    }
 
 }
 

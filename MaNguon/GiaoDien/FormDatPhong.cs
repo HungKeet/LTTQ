@@ -96,6 +96,7 @@ internal sealed class BookingEditor : Form
             }
         }
         Ui.Bind(rooms, data);
+        if (rooms.Columns.Contains("Id") && rooms.Columns["Id"] is { } colId) colId.Visible = false;
         foreach (DataGridViewColumn col in rooms.Columns)
             col.ReadOnly = col.Name != "Chọn";
         searchedArrival = From;
