@@ -1,4 +1,4 @@
-# Quản lý Khách sạn Ngọc Khoa
+# LTTQ_QuanLyKhachSan — Quản lý Khách sạn Ngọc Khoa
 
 Bài tập lớn môn Lập trình trực quan, sử dụng **C# Windows Forms, .NET 10 và SQL Server**. Ứng dụng có giao diện tiếng Việt, quản lý phòng, khách hàng, đặt phòng, nhận/trả phòng, dịch vụ, hóa đơn, tài khoản và doanh thu.
 
@@ -22,8 +22,8 @@ Có thể dùng [SQL Server LocalDB](https://learn.microsoft.com/en-us/sql/datab
 Mở PowerShell hoặc Terminal tại thư mục muốn lưu dự án:
 
 ```powershell
-git clone https://github.com/Khoazxjee/lttqtest.git
-cd lttqtest
+git clone https://github.com/quoctruongle766-star/LTTQ_QuanLyKhachSan.git
+cd LTTQ_QuanLyKhachSan
 dotnet --list-sdks
 dotnet restore .\QuanLyKhachSan.sln
 ```
@@ -62,7 +62,7 @@ Nếu muốn tạo bằng SSMS, kết nối đúng instance và chạy [CoSoDuLi
 
 ### Cách A — chạy bằng lệnh
 
-Từ thư mục `lttqtest`:
+Từ thư mục `LTTQ_QuanLyKhachSan`:
 
 ```powershell
 dotnet build .\QuanLyKhachSan.sln -c Release
