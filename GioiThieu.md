@@ -48,16 +48,17 @@ dotnet test KiemThu/KiemThuKhachSan -c Release
 | Tài khoản | Đăng nhập/đăng xuất, đổi mật khẩu, quản lý tài khoản, khóa/mở, vai trò quản lý/lễ tân |
 | Danh mục | Thêm, sửa, xóa bản ghi chưa dùng, ngừng hoạt động, tìm kiếm phòng/loại phòng/khách/dịch vụ/nhân viên |
 | Đặt phòng | Tra cứu theo khoảng ngày, nhiều phòng trong một phiếu, kiểm tra sức chứa, chống trùng lịch, sửa phiếu, cọc, hủy và ghi nhận hoàn cọc |
-| Lưu trú | Nhận phòng, khách đến trực tiếp qua phiếu đến hôm nay, đổi ngày đi, cảnh báo quá hạn |
+| Lưu trú | Nhận phòng, nhận khách nhanh tại quầy với khách mới/có sẵn, đổi phòng, đổi ngày giờ đi, cảnh báo quá hạn |
 | Dịch vụ | Thêm, sửa số lượng, xóa dòng trước thanh toán; lưu tên, đơn vị và giá lịch sử |
 | Thanh toán | Tiền đêm thực tế, dịch vụ, phụ thu, giảm giá, đối trừ tiền cọc, thu thêm hoặc hoàn khách, phương thức thanh toán |
 | Hóa đơn | Tra cứu, xem chi tiết, xem bản in, in/lưu PDF qua máy in Windows, xuất HTML; khóa sửa/xóa sau thanh toán |
-| Vận hành | Phòng chờ dọn sau trả phòng, xác nhận đã dọn, bảo trì, lịch sử khách hàng |
+| Vận hành | Bấm thống kê để lọc trạng thái kết hợp tầng/loại phòng, bấm thẻ phòng mở thao tác và chọn sẵn phòng, phòng chờ dọn sau trả/đổi phòng, xác nhận đã dọn, bảo trì, lịch sử khách hàng |
 | Báo cáo | Doanh thu theo ngày trong khoảng lọc, doanh thu dịch vụ, xuất CSV, nhật ký 500 thao tác gần nhất |
 
 ## Quy tắc đã chọn
 
-- Giờ dự kiến đến 14:00, đi 12:00. Nhận sớm trong cùng ngày được phép nếu phòng sẵn sàng và không xung đột.
+- Giờ dự kiến mặc định đến 14:00, đi 12:00; có thể sửa giờ và chọn đến/đi cùng ngày khi giờ đi sau giờ đến. Nhận sớm trong cùng ngày được phép nếu phòng sẵn sàng và không xung đột.
+- Đổi phòng trong lượt ở giữ giá đã chốt, tiền cọc và dịch vụ; kiểm tra sức chứa/lịch phòng mới, đánh dấu phòng cũ chờ dọn và ghi nhật ký. Phiếu quá giờ trả cần gia hạn trước khi đổi phòng.
 - Tính theo **chênh lệch ngày lịch thực tế, tối thiểu 1 đêm**; không phải đơn giá theo từng 24 giờ. Phụ thu sớm/muộn nhập thủ công sau khi thống nhất với khách.
 - Một phiếu nhận/trả cùng lúc tất cả phòng đã đặt. Dịch vụ gắn với phiếu chung. Chưa có tách hóa đơn hoặc trả riêng từng phòng.
 - Hủy trước nhận phòng hoàn toàn bộ tiền cọc, cần người dùng xác nhận đã hoàn. Chương trình ghi nhận thanh toán, không thực hiện chuyển tiền ngân hàng.

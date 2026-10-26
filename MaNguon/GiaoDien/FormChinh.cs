@@ -75,7 +75,7 @@ internal sealed class MainForm : Form
 
 
         // 1. Quản lý phòng & Đặt phòng
-        var dashboard = new DashboardPage(service, user);
+        var dashboard = new DashboardPage(service, user, settings);
         Page("Sơ đồ phòng", dashboard, dashboard.RefreshData);
 
         var bookings = new BookingsPage(service, user, settings);
@@ -178,122 +178,163 @@ internal sealed class PasswordForm : EditorForm
 
 
 internal sealed class DashboardPage : Panel
-
 {
-
     private readonly FlowLayoutPanel cards = new() { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(14), WrapContents = true };
+    private readonly Button summary;
+    private readonly Dictionary<string, Button> statusButtons = new();
+    private readonly ComboBox floor = Ui.Choices("Tất cả"), roomType = Ui.Choices("Tất cả");
+    private readonly HotelService service;
+    private readonly Session user;
+    private readonly AppSettings settings;
+    private string selectedStatus = "Tất cả";
+    private DataTable? data;
+    private bool loadingFilters;
 
-    private readonly Label summary = new() { AutoSize = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), Margin = new Padding(8, 12, 8, 8) };
+    public DashboardPage(HotelService service, Session user) : this(service, user, new AppSettings()) { }
 
-    private readonly HotelService service; private readonly Session user;
-
-    public DashboardPage(HotelService service, Session user)
-
+    public DashboardPage(HotelService service, Session user, AppSettings settings)
     {
-
         this.service = service;
-
         this.user = user;
-
+        this.settings = settings;
         Dock = DockStyle.Fill;
-
         var bar = Ui.Toolbar();
-
+        bar.Controls.Add(Ui.Label("Tầng"));
+        floor.Width = 100;
+        bar.Controls.Add(floor);
+        bar.Controls.Add(Ui.Label("Loại phòng"));
+        roomType.Width = 210;
+        bar.Controls.Add(roomType);
         bar.Controls.Add(Ui.Button("Tải lại phòng", RefreshData, true));
-
-        bar.Controls.Add(summary);
-
-        var help = new Label { Dock = DockStyle.Bottom, Height = 50, Padding = new Padding(14), ForeColor = Color.FromArgb(100, 116, 139), Text = "Trạng thái phòng: Xanh lá (Sẵn sàng) • Xám nhạt (Đang ở) • Vàng nhạt (Chờ dọn) • Đỏ nhạt (Bảo trì).\nQuản lý có thể bấm 'Đã dọn xong' để chuyển phòng chờ dọn về trạng thái sẵn sàng." };
-
+        var statistics = Ui.Toolbar();
+        statistics.Dock = DockStyle.Fill;
+        statistics.Padding = new Padding(8, 0, 8, 8);
+        foreach (var status in new[] { "Tất cả", "Sẵn sàng", "Đang ở", "Chờ dọn", "Bảo trì" })
+        {
+            var button = Ui.Button(status + ": 0", () => { selectedStatus = status; RenderRooms(); });
+            button.Name = "FilterStatus" + status;
+            button.Tag = status;
+            button.Cursor = Cursors.Hand;
+            statusButtons.Add(status, button);
+            statistics.Controls.Add(button);
+        }
+        summary = statusButtons["Tất cả"];
+        var controls = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, RowCount = 2 };
+        controls.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        controls.Controls.Add(bar, 0, 0);
+        controls.Controls.Add(statistics, 0, 1);
+        floor.SelectedIndexChanged += (_, _) => { if (!loadingFilters) RenderRooms(); };
+        roomType.SelectedIndexChanged += (_, _) => { if (!loadingFilters) RenderRooms(); };
+        var help = new Label { Dock = DockStyle.Bottom, Height = 72, Padding = new Padding(14), ForeColor = Color.FromArgb(100, 116, 139), Text = "Bấm trạng thái để lọc phòng; bấm thẻ phòng để mở thao tác. Bấm Tất cả để bỏ lọc trạng thái.\nSố lượng trên các nút thống kê theo tầng và loại phòng đang chọn." };
         Controls.Add(cards);
-
-        Controls.Add(bar);
-
+        Controls.Add(controls);
         Controls.Add(help);
-
     }
 
     public void RefreshData()
-
     {
-
-        var data = service.RoomsOverview(user);
-
-        cards.SuspendLayout();
-
-        while (cards.Controls.Count > 0)
-
+        data = service.RoomsOverview(user);
+        loadingFilters = true;
+        try
         {
-
-            var child = cards.Controls[0];
-
-            cards.Controls.Remove(child);
-
-            child.Dispose();
-
+            UpdateChoices(floor, data.AsEnumerable().Select(r => r.Field<int>("Tầng")).Distinct().Order().Select(n => n.ToString()));
+            UpdateChoices(roomType, data.AsEnumerable().Select(r => r.Field<string>("Loại phòng")!).Distinct().Order());
         }
-
-        var counts = data.AsEnumerable().GroupBy(r => r.Field<string>("Trạng thái")).ToDictionary(g => g.Key!, g => g.Count());
-
-        summary.Text = $"{data.Rows.Count} phòng  •  Sẵn sàng: {counts.GetValueOrDefault("Sẵn sàng")}  •  Đang ở: {counts.GetValueOrDefault("Đang ở")}  •  Chờ dọn: {counts.GetValueOrDefault("Chờ dọn")}  •  Bảo trì: {counts.GetValueOrDefault("Bảo trì")}";
-
-        foreach (DataRow r in data.Rows)
-
+        finally
         {
-
-            var roomId = r.Field<int>("Id");
-
-            var status = r.Field<string>("Trạng thái")!;
-
-            var overdue = !r.IsNull("Dự kiến trả") && r.Field<DateTime>("Dự kiến trả") < DateTime.Now;
-
-            var color = status switch
-
-            {
-
-                "Đang ở" => Color.FromArgb(241, 245, 249),
-
-                "Chờ dọn" => Color.FromArgb(254, 249, 235),
-
-                "Bảo trì" => Color.FromArgb(254, 242, 242),
-
-                _ => Color.FromArgb(240, 253, 244)
-
-            };
-
-            var card = new Panel { Size = new Size(278, 218), BackColor = color, Margin = new Padding(8), Padding = new Padding(12) };
-
-            var title = new Label { Text = $"Phòng {r["Số phòng"]} • {status}", Dock = DockStyle.Top, Height = 32, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = Ui.DarkText };
-
-            var detail = new Label { Dock = DockStyle.Fill, Text = $"{r["Loại phòng"]} • {r["Sức chứa"]} khách\n{Ui.Currency(r.Field<decimal>("Giá / đêm"))} / đêm\n" + (r.IsNull("Khách đang ở") ? "Phòng trống" : $"Khách: {r["Khách đang ở"]}\nTrả dự kiến: {r.Field<DateTime>("Dự kiến trả"):dd/MM HH:mm}\n" + (overdue ? "QUÁ HẠN TRẢ PHÒNG" : "")), Padding = new Padding(0, 5, 0, 0) };
-
-            card.Controls.Add(detail);
-
-            card.Controls.Add(title);
-
-            if (status == "Chờ dọn")
-
-            {
-
-                var button = Ui.Button("Đã dọn xong", () => { service.MarkRoomReady(user, roomId); RefreshData(); Ui.Info($"Phòng {r["Số phòng"]} đã được cập nhật sang trạng thái Sẵn sàng."); });
-
-                button.Dock = DockStyle.Bottom;
-
-                card.Controls.Add(button);
-
-            }
-
-            cards.Controls.Add(card);
-
+            loadingFilters = false;
         }
-
-        cards.ResumeLayout();
-
+        RenderRooms();
     }
 
+    private static void UpdateChoices(ComboBox combo, IEnumerable<string> values)
+    {
+        var selected = combo.SelectedItem as string;
+        combo.Items.Clear();
+        combo.Items.Add("Tất cả");
+        combo.Items.AddRange(values.Cast<object>().ToArray());
+        combo.SelectedItem = selected is not null && combo.Items.Contains(selected) ? selected : "Tất cả";
+    }
+
+    private void RenderRooms()
+    {
+        if (data is null)
+            return;
+        var scope = data.AsEnumerable().Where(r =>
+            (floor.SelectedIndex <= 0 || r.Field<int>("Tầng").ToString() == floor.Text) &&
+            (roomType.SelectedIndex <= 0 || r.Field<string>("Loại phòng") == roomType.Text)).ToArray();
+        var rows = scope.Where(r => selectedStatus == "Tất cả" || r.Field<string>("Trạng thái") == selectedStatus).ToArray();
+        var counts = scope.GroupBy(r => r.Field<string>("Trạng thái")).ToDictionary(g => g.Key!, g => g.Count());
+        foreach (var (status, button) in statusButtons)
+        {
+            button.Text = status == "Tất cả" ? $"Tất cả: {scope.Length} phòng" : $"{status}: {counts.GetValueOrDefault(status)}";
+            var selected = selectedStatus == status;
+            button.BackColor = selected ? Ui.Slate : Color.White;
+            button.ForeColor = selected ? Color.White : Ui.DarkText;
+            button.FlatAppearance.BorderColor = selected ? Ui.Slate : Color.FromArgb(203, 213, 225);
+            button.AccessibleName = button.Text + (selected ? ", đang lọc" : ", bấm để lọc");
+        }
+        summary.AccessibleDescription = $"Đang hiển thị {rows.Length}/{scope.Length} phòng trong {data.Rows.Count} phòng. Bấm để xem tất cả trạng thái.";
+        cards.AutoScrollPosition = Point.Empty;
+        cards.SuspendLayout();
+        try
+        {
+            while (cards.Controls.Count > 0)
+            {
+                var child = cards.Controls[0];
+                cards.Controls.Remove(child);
+                child.Dispose();
+            }
+            if (rows.Length == 0)
+                cards.Controls.Add(new Label { AutoSize = true, Padding = new Padding(14), Text = "Không có phòng phù hợp với bộ lọc đã chọn.", ForeColor = Ui.DarkText });
+            foreach (var r in rows)
+            {
+                var roomId = r.Field<int>("Id");
+                var status = r.Field<string>("Trạng thái")!;
+                var overdue = !r.IsNull("Dự kiến trả") && r.Field<DateTime>("Dự kiến trả") < DateTime.Now;
+                var color = status switch
+                {
+                    "Đang ở" => Color.FromArgb(241, 245, 249),
+                    "Chờ dọn" => Color.FromArgb(254, 249, 235),
+                    "Bảo trì" => Color.FromArgb(254, 242, 242),
+                    _ => Color.FromArgb(240, 253, 244)
+                };
+                var card = new Panel { Size = new Size(278, 248), BackColor = color, Margin = new Padding(8), Padding = new Padding(12), Cursor = Cursors.Hand, Tag = roomId, AccessibleName = $"Phòng {r["Số phòng"]}, {status}. Mở thao tác phòng." };
+                var title = new Label { Text = $"Phòng {r["Số phòng"]} • {status}", Dock = DockStyle.Top, Height = 44, AutoEllipsis = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = Ui.DarkText };
+                var detail = new Label { Dock = DockStyle.Fill, Text = $"{r["Loại phòng"]} • Tầng {r["Tầng"]} • {r["Sức chứa"]} khách\n{Ui.Currency(r.Field<decimal>("Giá / đêm"))} / đêm\n" + (r.IsNull("Khách đang ở") ? "Phòng trống" : $"Khách: {r["Khách đang ở"]}\nTrả dự kiến: {r.Field<DateTime>("Dự kiến trả"):dd/MM HH:mm}\n" + (overdue ? "QUÁ HẠN TRẢ PHÒNG" : "")), Padding = new Padding(0, 5, 0, 0) };
+                card.Controls.Add(detail);
+                card.Controls.Add(title);
+                void OpenRoom()
+                {
+                    using var form = new RoomActionsForm(service, user, settings, roomId);
+                    form.ShowDialog(this);
+                    RefreshData();
+                }
+                card.Click += (_, _) => Ui.Run(OpenRoom);
+                title.Cursor = detail.Cursor = Cursors.Hand;
+                title.Click += (_, _) => Ui.Run(OpenRoom);
+                detail.Click += (_, _) => Ui.Run(OpenRoom);
+                var button = status == "Chờ dọn"
+                    ? Ui.Button("Đã dọn xong", () =>
+                    {
+                        if (!Ui.Confirm($"Xác nhận phòng {r["Số phòng"]} đã dọn xong và sẵn sàng đón khách?"))
+                            return;
+                        service.MarkRoomReady(user, roomId);
+                        RefreshData();
+                    })
+                    : Ui.Button("Thao tác", OpenRoom);
+                button.Cursor = Cursors.Hand;
+                button.Dock = DockStyle.Bottom;
+                card.Controls.Add(button);
+                cards.Controls.Add(card);
+            }
+        }
+        finally
+        {
+            cards.ResumeLayout();
+        }
+    }
 }
-
-
 
 internal sealed class BarChartControl : Panel
 

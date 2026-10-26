@@ -29,33 +29,52 @@ internal sealed class CheckoutForm : Form
         var bar = Ui.Toolbar();
         var method = Ui.Choices("Tiền mặt", "Chuyển khoản", "Thẻ");
         var notes = new TextBox { Width = 480, MaxLength = 1000, PlaceholderText = "Ghi chú trả phòng (tình trạng phòng, vật phẩm, lưu ý...)" };
+        Button? payButton = null;
 
-        void Calculate()
+        bool Calculate()
         {
-            quote = service.PreviewCheckout(user, bookingId, surcharge.Value, discount.Value);
-            var table = new DataTable();
-            table.Columns.Add("STT");
-            table.Columns.Add("Khoản mục");
-            table.Columns.Add("Nội dung dịch vụ");
-            table.Columns.Add("Số lượng", typeof(decimal));
-            table.Columns.Add("Đơn vị");
-            table.Columns.Add("Đơn giá", typeof(decimal));
-            table.Columns.Add("Thành tiền", typeof(decimal));
-
-            int stt = 1;
-            foreach (var line in quote.Lines)
+            quote = null;
+            if (payButton is not null)
+                payButton.Enabled = false;
+            try
             {
-                table.Rows.Add((stt++).ToString(), line.Kind, line.Description, line.Quantity, line.Unit, line.UnitPrice, line.Amount);
+                quote = service.PreviewCheckout(user, bookingId, surcharge.Value, discount.Value);
+                var table = new DataTable();
+                table.Columns.Add("STT");
+                table.Columns.Add("Khoản mục");
+                table.Columns.Add("Nội dung dịch vụ");
+                table.Columns.Add("Số lượng", typeof(decimal));
+                table.Columns.Add("Đơn vị");
+                table.Columns.Add("Đơn giá", typeof(decimal));
+                table.Columns.Add("Thành tiền", typeof(decimal));
+
+                int stt = 1;
+                foreach (var line in quote.Lines)
+                {
+                    table.Rows.Add((stt++).ToString(), line.Kind, line.Description, line.Quantity, line.Unit, line.UnitPrice, line.Amount);
+                }
+                Ui.Bind(grid, table);
+
+                var balanceText = quote.Balance >= 0
+                    ? $"▶ CẦN THU THÊM TẠI QUẦY: {Ui.Currency(quote.Balance)}"
+                    : $"▶ CẦN HOÀN LẠI CHO KHÁCH: {Ui.Currency(-quote.Balance)}";
+
+                summary.Text = $"Cộng tiền phòng & dịch vụ: {Ui.Currency(quote.Subtotal)}   |   Phụ thu: +{Ui.Currency(quote.Surcharge)}   |   Giảm trừ: -{Ui.Currency(quote.Discount)}\n" +
+                               $"TỔNG THANH TOÁN: {Ui.Currency(quote.Total)}   •   Tiền đặt cọc đã đối trừ: -{Ui.Currency(quote.Deposit)}\n" +
+                               $"{balanceText}  (Phương thức: {method.Text})";
+                summary.ForeColor = Ui.DarkText;
+                if (payButton is not null)
+                    payButton.Enabled = true;
+                return true;
             }
-            Ui.Bind(grid, table);
-
-            var balanceText = quote.Balance >= 0
-                ? $"▶ CẦN THU THÊM TẠI QUẦY: {Ui.Currency(quote.Balance)}"
-                : $"▶ CẦN HOÀN LẠI CHO KHÁCH: {Ui.Currency(-quote.Balance)}";
-
-            summary.Text = $"Cộng tiền phòng & dịch vụ: {Ui.Currency(quote.Subtotal)}   |   Phụ thu: +{Ui.Currency(quote.Surcharge)}   |   Giảm trừ: -{Ui.Currency(quote.Discount)}\n" +
-                           $"TỔNG THANH TOÁN: {Ui.Currency(quote.Total)}   •   Tiền đặt cọc đã đối trừ: -{Ui.Currency(quote.Deposit)}\n" +
-                           $"{balanceText}  (Phương thức: {method.Text})";
+            catch (Exception e)
+            {
+                quote = null;
+                grid.DataSource = null;
+                summary.ForeColor = Color.Firebrick;
+                summary.Text = "Chưa thể thanh toán: " + e.Message;
+                return false;
+            }
         }
 
         bar.Controls.Add(Ui.Label("Phụ thu (đ):"));
@@ -64,15 +83,16 @@ internal sealed class CheckoutForm : Form
         bar.Controls.Add(discount);
         bar.Controls.Add(Ui.Label("Thanh toán:"));
         bar.Controls.Add(method);
-        bar.Controls.Add(Ui.Button("Tính lại", Calculate));
+        bar.Controls.Add(Ui.Button("Tính lại", () => Calculate()));
 
         var footer = Ui.Toolbar();
         footer.Dock = DockStyle.Bottom;
         footer.Controls.Add(Ui.Label("Ghi chú:"));
         footer.Controls.Add(notes);
-        footer.Controls.Add(Ui.Button("Xác nhận thanh toán & Trả phòng", () =>
+        payButton = Ui.Button("Xác nhận thanh toán & Trả phòng", () =>
         {
-            Calculate();
+            if (!Calculate())
+                return;
             var q = quote!;
             var amount = q.Balance >= 0 ? $"thu thêm {Ui.Currency(q.Balance)}" : $"hoàn lại {Ui.Currency(-q.Balance)}";
             if (!Ui.Confirm($"Xác nhận {amount} qua hình thức {method.Text.ToLower()} và hoàn tất thủ tục trả phòng?\nHóa đơn thanh toán sẽ được khóa và lưu vào hệ thống."))
@@ -83,11 +103,12 @@ internal sealed class CheckoutForm : Form
             using var invoice = new InvoiceForm(service.Invoice(user, invoiceId), settings);
             invoice.ShowDialog(this);
             Close();
-        }, true));
+        }, true);
+        footer.Controls.Add(payButton);
 
-        surcharge.ValueChanged += (_, _) => { quote = null; summary.Text = "Khoản điều chỉnh đã thay đổi. Bấm 'Tính lại' để cập nhật số tiền."; };
-        discount.ValueChanged += (_, _) => { quote = null; summary.Text = "Khoản điều chỉnh đã thay đổi. Bấm 'Tính lại' để cập nhật số tiền."; };
-        method.SelectedIndexChanged += (_, _) => { if (quote != null) Calculate(); };
+        surcharge.ValueChanged += (_, _) => Calculate();
+        discount.ValueChanged += (_, _) => Calculate();
+        method.SelectedIndexChanged += (_, _) => Calculate();
 
         Controls.Add(grid);
         Controls.Add(bar);

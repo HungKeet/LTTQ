@@ -14,8 +14,13 @@ public sealed partial class HotelService
         var lines = new List<InvoiceLine>();
         foreach (DataRow room in Database.Query(c, t, "SELECT r.Number,br.NightlyRate FROM BookingRooms br JOIN Rooms r ON r.Id=br.RoomId WHERE br.BookingId=@id ORDER BY r.Number", ("@id", bookingId)).Rows)
             lines.Add(new InvoiceLine("Phòng", "Phòng " + room["Number"], nights, "Đêm", room.Field<decimal>("NightlyRate")));
-        foreach (DataRow usage in Database.Query(c, t, "SELECT * FROM ServiceUsages WHERE BookingId=@id ORDER BY Id", ("@id", bookingId)).Rows)
-            lines.Add(new InvoiceLine("Dịch vụ", usage.Field<string>("ServiceName")!, usage.Field<int>("Quantity"), usage.Field<string>("Unit")!, usage.Field<decimal>("UnitPrice")));
+        // Keep price/name snapshots separate while combining repeated uses of the same service.
+        foreach (DataRow usage in Database.Query(c, t, """
+            SELECT ServiceId,ServiceName,Unit,UnitPrice,SUM(CONVERT(decimal(18,0),Quantity)) AS Quantity
+            FROM ServiceUsages WHERE BookingId=@id
+            GROUP BY ServiceId,ServiceName,Unit,UnitPrice ORDER BY MIN(Id)
+            """, ("@id", bookingId)).Rows)
+            lines.Add(new InvoiceLine("Dịch vụ", usage.Field<string>("ServiceName")!, usage.Field<decimal>("Quantity"), usage.Field<string>("Unit")!, usage.Field<decimal>("UnitPrice")));
         Money.ValidateAdjustments(lines.Sum(x => x.Amount), surcharge, discount);
         return new CheckoutQuote(bookingId, checkoutAt, lines, Money.Round(surcharge), Money.Round(discount), b.Field<decimal>("Deposit"));
     }

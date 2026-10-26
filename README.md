@@ -145,9 +145,11 @@ $env:HOTEL_TEST_CONNECTION = 'Server=(localdb)\MSSQLLocalDB;Integrated Security=
 dotnet test .\KiemThu\KiemThuKhachSan\KiemThuKhachSan.csproj -c Release
 ```
 
-Các database kiểm thử được giữ để kiểm tra kết quả, có thể xóa thủ công trong SSMS khi không cần. Bộ kiểm thử hiện có **32 trường hợp**.
+Các database kiểm thử được giữ để kiểm tra kết quả, có thể xóa thủ công trong SSMS khi không cần. Bộ kiểm thử hiện có **56 trường hợp**.
 
 Bản nâng cấp đã được kiểm tra ngày **25/10/2026** bằng SDK **10.0.400**: biên dịch Release **0 lỗi, 0 cảnh báo**, **32/32 kiểm thử đạt** trên .NET 10. Bản EXE Windows x64 kèm runtime **10.0.11** đã chạy kiểm tra giao diện với 22 ảnh các màn hình, xuất hóa đơn HTML và in hóa đơn PDF. Kiểm tra gói NuGet, gồm cả phụ thuộc gián tiếp, không còn cảnh báo lỗ hổng từ nguồn NuGet tại thời điểm kiểm tra.
+
+Bản sửa nghiệp vụ ngày **26/10/2026** đã biên dịch Release **0 lỗi, 0 cảnh báo** bằng SDK **10.0.403**, **56/56 kiểm thử đạt** trên SQL Server cục bộ với database kiểm thử riêng. Các ca mới kiểm tra lịch tương lai khi khách quá giờ trả, giờ nhận thực tế, đặt cùng ngày, đổi phòng, nhận phòng nhanh, giao dịch đồng thời, rollback và gộp dịch vụ có nhiều mức giá. Xem [hướng dẫn sử dụng](HuongDan/HuongDanSuDung.md) cho các thao tác mới. Thời gian đến/đi cùng ngày được hỗ trợ, giá hiện tại vẫn tối thiểu một đêm; chưa có bảng giá riêng theo giờ.
 
 Để kiểm tra giao diện trên máy có SQL Server sau khi publish:
 
