@@ -12,6 +12,8 @@ Cấu hình mặc định hiện là `Server=lpc:.\SQLEXPRESS;Database=HotelMana
 
 Muốn tạo dữ liệu bằng SSMS: mở `CoSoDuLieu/CaiDat.sql`, kết nối đúng instance, Execute. Script chỉ tạo khi chưa tồn tại và không xóa dữ liệu. Sau đó sửa chuỗi kết nối trong `BanChay/CauHinh.json` để trỏ cùng instance/database.
 
+Nếu muốn nạp trọn bộ dữ liệu thực tế (gồm 23 phòng đủ các tầng, 53 khách hàng, 20 phiếu đặt, 15 hóa đơn thực tế và toàn bộ lịch sử giao dịch): mở file `CoSoDuLieu/DuLieuDayDu.sql` trong SSMS và bấm Execute (F5), hoặc Restore trực tiếp từ tệp sao lưu `CoSoDuLieu/HotelManagementBTL.bak`. Bạn cũng có thể chạy `CoSoDuLieu/XuatDuLieu.ps1` bất cứ lúc nào để trích xuất lại dữ liệu mới nhất từ máy.
+
 ## 2. Quy trình sử dụng
 
 1. **Khách hàng → Thêm mới**: nhập họ tên, điện thoại; có thể thêm giấy tờ và địa chỉ. Nhấn Lưu. Khi nhập sai, thông báo xuất hiện và biểu mẫu giữ nguyên dữ liệu để sửa.

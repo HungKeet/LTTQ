@@ -9,10 +9,9 @@ internal sealed class LoginForm : EditorForm
     {
         get; private set;
     }
-    public LoginForm(HotelService service, AppSettings settings) : base("Đăng nhập • Quản lý khách sạn", 330)
+    public LoginForm(HotelService service, AppSettings settings) : base("Đăng nhập • Quản lý khách sạn", 270)
     {
         SetHeading(settings.HotelName, "Đăng nhập để bắt đầu ca làm việc.");
-        AddField("Chào mừng", new Label { Text = "Quản lý phòng, dịch vụ và lưu trú\ntrong một không gian làm việc.", AutoSize = false }, 60);
         var username = new TextBox { Text = "admin", MaxLength = 40 };
         var password = new TextBox { UseSystemPasswordChar = true, MaxLength = 100 };
         AddField("Tên đăng nhập", username);
