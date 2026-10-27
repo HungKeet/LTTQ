@@ -268,13 +268,19 @@ internal sealed class DashboardPage : Panel
                 var overdue = !r.IsNull("Dự kiến trả") && r.Field<DateTime>("Dự kiến trả") < DateTime.Now;
                 var (color, titleColor, borderColor) = status switch
                 {
-                    "Đang ở" => (Color.FromArgb(224, 242, 254), Color.FromArgb(7, 89, 133), Color.FromArgb(186, 230, 253)),
-                    "Chờ dọn" => (Color.FromArgb(254, 243, 199), Color.FromArgb(146, 64, 14), Color.FromArgb(253, 230, 138)),
-                    "Bảo trì" => (Color.FromArgb(254, 226, 226), Color.FromArgb(153, 27, 27), Color.FromArgb(254, 202, 202)),
-                    _ => (Color.FromArgb(220, 252, 231), Color.FromArgb(22, 101, 52), Color.FromArgb(187, 247, 208))
+                    "Đang ở" => (Color.FromArgb(191, 219, 254), Color.FromArgb(29, 78, 216), Color.FromArgb(147, 197, 253)),
+                    "Chờ dọn" => (Color.FromArgb(254, 240, 190), Color.FromArgb(161, 98, 7), Color.FromArgb(251, 191, 36)),
+                    "Bảo trì" => (Color.FromArgb(254, 215, 215), Color.FromArgb(185, 28, 28), Color.FromArgb(248, 113, 113)),
+                    _ => (Color.FromArgb(210, 248, 210), Color.FromArgb(21, 128, 61), Color.FromArgb(134, 239, 172))
                 };
                 var card = new Panel { Size = new Size(266, 230), BackColor = color, Margin = new Padding(8), Padding = new Padding(12), Cursor = Cursors.Hand, Tag = roomId, AccessibleName = $"Phòng {r["Số phòng"]}, {status}. Mở thao tác phòng." };
-                card.Paint += (_, e) => { using var p = new Pen(borderColor, 1.5f); e.Graphics.DrawRectangle(p, 0, 0, card.Width - 1, card.Height - 1); };
+                card.Paint += (_, e) =>
+                {
+                    using var p = new Pen(borderColor, 1.5f);
+                    e.Graphics.DrawRectangle(p, 0, 0, card.Width - 1, card.Height - 1);
+                    using var bar = new SolidBrush(titleColor);
+                    e.Graphics.FillRectangle(bar, 0, 0, card.Width, 5);
+                };
                 var title = new Label { Text = $"Phòng {r["Số phòng"]} • {status}", Dock = DockStyle.Top, Height = 44, AutoEllipsis = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = titleColor };
                 var detail = new Label { Dock = DockStyle.Fill, Text = $"{r["Loại phòng"]} • Tầng {r["Tầng"]} • {r["Sức chứa"]} khách\n{Ui.Currency(r.Field<decimal>("Giá / đêm"))} / đêm\n" + (r.IsNull("Khách đang ở") ? "Phòng trống" : $"Khách: {r["Khách đang ở"]}\nTrả dự kiến: {r.Field<DateTime>("Dự kiến trả"):dd/MM HH:mm}\n" + (overdue ? "QUÁ HẠN TRẢ PHÒNG" : "")), Padding = new Padding(0, 5, 0, 0) };
                 card.Controls.Add(detail);
