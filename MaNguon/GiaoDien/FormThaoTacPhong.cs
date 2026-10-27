@@ -72,17 +72,17 @@ internal sealed class RoomActionsForm : Form
         heading.Text = $"Phòng {row["Số phòng"]} • {displayedStatus}";
         heading.BackColor = displayedStatus switch
         {
-            "Sẵn sàng" => Color.FromArgb(232, 242, 236),
-            "Đang ở" => Color.FromArgb(233, 239, 246),
-            "Chờ dọn" => Color.FromArgb(249, 241, 225),
-            _ => Color.FromArgb(239, 237, 242)
+            "Sẵn sàng" => Color.FromArgb(220, 252, 231),
+            "Đang ở" => Color.FromArgb(224, 242, 254),
+            "Chờ dọn" => Color.FromArgb(254, 243, 199),
+            _ => Color.FromArgb(254, 226, 226)
         };
         heading.ForeColor = displayedStatus switch
         {
-            "Sẵn sàng" => Color.FromArgb(46, 92, 70),
-            "Đang ở" => Color.FromArgb(55, 79, 109),
-            "Chờ dọn" => Color.FromArgb(124, 91, 47),
-            _ => Color.FromArgb(92, 78, 105)
+            "Sẵn sàng" => Color.FromArgb(22, 101, 52),
+            "Đang ở" => Color.FromArgb(7, 89, 133),
+            "Chờ dọn" => Color.FromArgb(146, 64, 14),
+            _ => Color.FromArgb(153, 27, 27)
         };
         details.Text = $"{row["Loại phòng"]} • Tầng {row["Tầng"]} • Sức chứa {row["Sức chứa"]} khách\n" +
             $"Giá danh mục: {Ui.Currency(row.Field<decimal>("Giá / đêm"))} / đêm\n\n" +
