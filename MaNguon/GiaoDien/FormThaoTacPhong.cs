@@ -10,9 +10,9 @@ internal sealed class RoomActionsForm : Form
     private readonly Session user;
     private readonly AppSettings settings;
     private readonly int roomId;
-    private readonly Label heading = new() { Dock = DockStyle.Top, Height = 50, Font = new Font("Segoe UI", 15, FontStyle.Bold), Padding = new Padding(16, 10, 16, 4) };
-    private readonly Label details = new() { Dock = DockStyle.Top, Height = 185, Padding = new Padding(16, 8, 16, 8) };
-    private readonly FlowLayoutPanel actions = new() { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(12), WrapContents = true };
+    private readonly Label heading = new() { Dock = DockStyle.Top, Height = 68, Font = new Font("Segoe UI", 16, FontStyle.Bold), Padding = new Padding(20, 16, 20, 12), TextAlign = ContentAlignment.MiddleLeft };
+    private readonly Label details = new() { Dock = DockStyle.Top, Height = 180, Padding = new Padding(20, 14, 20, 12), BackColor = Color.White, ForeColor = Ui.DarkText };
+    private readonly FlowLayoutPanel actions = new() { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(14, 4, 14, 12), WrapContents = true };
     private string displayedStatus = "";
     private int? displayedBooking;
 
@@ -22,14 +22,17 @@ internal sealed class RoomActionsForm : Form
         this.user = user;
         this.settings = settings;
         this.roomId = roomId;
-        Ui.Setup(this, "Thao tác phòng", 660, 460);
-        MinimumSize = new Size(620, 450);
-        var footer = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 58, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(8) };
+        Ui.Setup(this, "Thao tác phòng", 680, 540);
+        MinimumSize = new Size(660, 520);
+        var footer = Ui.Toolbar();
+        footer.Dock = DockStyle.Bottom;
+        footer.FlowDirection = FlowDirection.RightToLeft;
         var close = Ui.Button("Đóng", Close);
         footer.Controls.Add(close);
         footer.Controls.Add(Ui.Button("Tải lại", RefreshRoom));
         CancelButton = close;
         Controls.Add(actions);
+        Controls.Add(new Label { Dock = DockStyle.Top, Height = 36, Text = "THAO TÁC VỚI PHÒNG", Padding = new Padding(20, 10, 20, 0), Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(100, 116, 139) });
         Controls.Add(details);
         Controls.Add(heading);
         Controls.Add(footer);
@@ -55,7 +58,8 @@ internal sealed class RoomActionsForm : Form
     {
         var button = Ui.Button(text, action, primary);
         button.Name = name;
-        button.MinimumSize = new Size(180, 40);
+        button.MinimumSize = new Size(190, 42);
+        button.Margin = new Padding(6);
         actions.Controls.Add(button);
     }
 
@@ -66,6 +70,20 @@ internal sealed class RoomActionsForm : Form
         displayedBooking = row.Field<int?>("Mã phiếu");
         Text = "Thao tác phòng " + row["Số phòng"];
         heading.Text = $"Phòng {row["Số phòng"]} • {displayedStatus}";
+        heading.BackColor = displayedStatus switch
+        {
+            "Sẵn sàng" => Color.FromArgb(232, 242, 236),
+            "Đang ở" => Color.FromArgb(233, 239, 246),
+            "Chờ dọn" => Color.FromArgb(249, 241, 225),
+            _ => Color.FromArgb(239, 237, 242)
+        };
+        heading.ForeColor = displayedStatus switch
+        {
+            "Sẵn sàng" => Color.FromArgb(46, 92, 70),
+            "Đang ở" => Color.FromArgb(55, 79, 109),
+            "Chờ dọn" => Color.FromArgb(124, 91, 47),
+            _ => Color.FromArgb(92, 78, 105)
+        };
         details.Text = $"{row["Loại phòng"]} • Tầng {row["Tầng"]} • Sức chứa {row["Sức chứa"]} khách\n" +
             $"Giá danh mục: {Ui.Currency(row.Field<decimal>("Giá / đêm"))} / đêm\n\n" +
             (displayedBooking.HasValue

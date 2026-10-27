@@ -4,6 +4,29 @@ using Hotel.Core;
 
 namespace Hotel.WinForms;
 
+internal static class OperationalLayout
+{
+    // Keep a label with its input when a toolbar wraps on a smaller window.
+    internal static FlowLayoutPanel Field(string text, Control input)
+    {
+        var group = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            WrapContents = false,
+            Margin = new Padding(0, 0, 12, 0),
+            Padding = Padding.Empty,
+            BackColor = Color.Transparent
+        };
+        var label = Ui.Label(text);
+        label.Margin = new Padding(0, 9, 8, 4);
+        input.Margin = new Padding(0, 5, 0, 4);
+        group.Controls.Add(label);
+        group.Controls.Add(input);
+        return group;
+    }
+}
+
 internal sealed class BookingEditor : Form
 {
     private readonly HotelService service; private readonly Session user; private readonly int? id;
@@ -11,7 +34,7 @@ internal sealed class BookingEditor : Form
     private readonly DataGridView rooms = Ui.Grid(); private readonly ComboBox customer;
     private readonly DateTimePicker arrival = Ui.Date(DateTime.Today.AddHours(14)), departure = Ui.Date(DateTime.Today.AddDays(1).AddHours(12));
     private readonly NumericUpDown guests = Ui.Number(200, 1, 1), deposit = Ui.Number();
-    private readonly TextBox notes = new() { MaxLength = 1000, Width = 550 };
+    private readonly TextBox notes = new() { MaxLength = 1000, Width = 380, PlaceholderText = "Yêu cầu hoặc lưu ý của khách" };
     private readonly Label totals = Ui.Label(""); private DateTime searchedArrival, searchedDeparture;
     private readonly Dictionary<int, (decimal Rate, int Capacity)> snapshots = new();
     private readonly HashSet<int> selectedRooms = new();
@@ -35,8 +58,8 @@ internal sealed class BookingEditor : Form
         this.user = user;
         this.id = id;
         this.walkIn = walkIn;
-        Ui.Setup(this, walkIn ? "Nhận phòng nhanh tại quầy" : id.HasValue ? $"Sửa phiếu đặt #{id}" : "Lập phiếu đặt phòng", 1100, walkIn ? 680 : 760);
-        MinimumSize = walkIn ? new Size(1020, 720) : new Size(900, 650);
+        Ui.Setup(this, walkIn ? "Nhận phòng nhanh tại quầy" : id.HasValue ? $"Sửa phiếu đặt #{id}" : "Lập phiếu đặt phòng", 1100, 760);
+        MinimumSize = new Size(960, 700);
         arrival.CustomFormat = departure.CustomFormat = "dd/MM/yyyy HH:mm";
         arrival.Width = departure.Width = 185;
         if (walkIn)
@@ -61,60 +84,65 @@ internal sealed class BookingEditor : Form
         }
         else if (preferredRoomId.HasValue)
             selectedRooms.Add(preferredRoomId.Value);
-        var form = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, Padding = new Padding(8) };
+        var form = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 1, RowCount = 5, Padding = new Padding(12, 12, 12, 8), BackColor = Ui.Background };
+        form.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        for (var row = 0; row < form.RowCount; row++)
+            form.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         var line1 = Ui.Toolbar();
-        line1.Controls.Add(Ui.Label("Khách hàng *"));
-        line1.Controls.Add(customer);
+        customer.Width = 340;
+        line1.Controls.Add(OperationalLayout.Field("Khách hàng *", customer));
         if (walkIn)
             line1.Controls.Add(newCustomer);
         else
             line1.Controls.Add(Ui.Button("Thêm khách", () => { using var editor = new CatalogEditor(service, user, CatalogKind.Customers); if (editor.ShowDialog(this) == DialogResult.OK) { customer.DataSource = service.Lookup(user, CatalogKind.Customers); customer.SelectedValue = editor.SavedId; } }));
-        var customerFields = new TableLayoutPanel { AutoSize = true, Dock = DockStyle.Top, ColumnCount = 1, Visible = false };
         var customerLine1 = Ui.Toolbar();
-        customerLine1.Controls.Add(Ui.Label("Họ tên *"));
-        customerLine1.Controls.Add(fullName);
-        customerLine1.Controls.Add(Ui.Label("Điện thoại *"));
-        customerLine1.Controls.Add(phone);
+        customerLine1.Visible = false;
+        customerLine1.Controls.Add(OperationalLayout.Field("Họ tên *", fullName));
+        customerLine1.Controls.Add(OperationalLayout.Field("Điện thoại *", phone));
         var customerLine2 = Ui.Toolbar();
-        customerLine2.Controls.Add(Ui.Label("Giấy tờ"));
-        customerLine2.Controls.Add(identity);
-        customerLine2.Controls.Add(Ui.Label("Địa chỉ"));
-        customerLine2.Controls.Add(address);
-        customerFields.Controls.Add(customerLine1);
-        customerFields.Controls.Add(customerLine2);
-        newCustomer.CheckedChanged += (_, _) => { customer.Enabled = !newCustomer.Checked; customerFields.Visible = newCustomer.Checked; };
+        customerLine2.Visible = false;
+        customerLine2.Controls.Add(OperationalLayout.Field("Giấy tờ", identity));
+        customerLine2.Controls.Add(OperationalLayout.Field("Địa chỉ", address));
+        newCustomer.CheckedChanged += (_, _) =>
+        {
+            customer.Enabled = !newCustomer.Checked;
+            customerLine1.Visible = customerLine2.Visible = walkIn && newCustomer.Checked;
+        };
         if (walkIn && customer.Items.Count == 0)
             newCustomer.Checked = true;
         var line2 = Ui.Toolbar();
-        line2.Controls.Add(Ui.Label(walkIn ? "Nhận ngay" : "Đến lúc *"));
-        line2.Controls.Add(arrival);
-        line2.Controls.Add(Ui.Label("Đi lúc *"));
-        line2.Controls.Add(departure);
-        line2.Controls.Add(Ui.Label("Số khách *"));
+        line2.Controls.Add(OperationalLayout.Field(walkIn ? "Nhận ngay" : "Đến lúc *", arrival));
+        line2.Controls.Add(OperationalLayout.Field("Đi lúc *", departure));
         guests.Width = 90;
-        line2.Controls.Add(guests);
+        line2.Controls.Add(OperationalLayout.Field("Số khách *", guests));
         line2.Controls.Add(Ui.Button("Tải lại phòng", FindRooms));
         var line3 = Ui.Toolbar();
-        line3.Controls.Add(Ui.Label("Cọc đã nhận (đ)"));
-        line3.Controls.Add(deposit);
-        line3.Controls.Add(Ui.Label("Ghi chú"));
-        line3.Controls.Add(notes);
-        form.Controls.Add(line1);
-        if (walkIn)
-            form.Controls.Add(customerFields);
-        form.Controls.Add(line2);
-        form.Controls.Add(line3);
-        var footer = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(12), FlowDirection = FlowDirection.RightToLeft };
-        footer.Controls.Add(Ui.Button("Đóng", Close));
+        line3.Controls.Add(OperationalLayout.Field("Cọc đã nhận (đ)", deposit));
+        line3.Controls.Add(OperationalLayout.Field("Ghi chú", notes));
+        form.Controls.Add(line1, 0, 0);
+        form.Controls.Add(customerLine1, 0, 1);
+        form.Controls.Add(customerLine2, 0, 2);
+        form.Controls.Add(line2, 0, 3);
+        form.Controls.Add(line3, 0, 4);
+        var footer = Ui.Toolbar();
+        footer.Dock = DockStyle.Bottom;
+        footer.FlowDirection = FlowDirection.RightToLeft;
+        var close = Ui.Button("Đóng", Close);
+        footer.Controls.Add(close);
+        CancelButton = close;
         saveButton = Ui.Button(walkIn ? "Lưu và nhận phòng ngay" : "Lưu phiếu đặt", Save, true);
         saveButton.Enabled = false;
         footer.Controls.Add(saveButton);
-        var info = new Label { Dock = DockStyle.Bottom, Height = walkIn ? 90 : 76, Padding = new Padding(12), Text = "Chọn phòng bằng ô tích. Danh sách phòng và tiền dự kiến tự cập nhật khi đổi thời gian.\nCó thể chọn giờ đến và đi trong cùng ngày. Giá hiện tại tính theo đêm lịch, tối thiểu 1 đêm."
+        var info = new Label { Dock = DockStyle.Bottom, Height = walkIn ? 80 : 60, Padding = new Padding(16, 10, 16, 8), Font = new Font("Segoe UI", 9F), ForeColor = Color.FromArgb(100, 116, 139), Text = "Chọn phòng bằng ô tích. Danh sách phòng và tiền dự kiến tự cập nhật khi đổi thời gian.\nCó thể chọn giờ đến và đi trong cùng ngày. Giá hiện tại tính theo đêm lịch, tối thiểu 1 đêm."
             + (walkIn ? "\nThông tin khách, phiếu đặt và nhận phòng được lưu cùng một lần." : "") };
         totals.Dock = DockStyle.Bottom;
-        totals.Height = 36;
+        totals.Height = 48;
         totals.AutoSize = false;
-        totals.Padding = new Padding(12, 0, 0, 0);
+        totals.Padding = new Padding(16, 4, 16, 4);
+        totals.TextAlign = ContentAlignment.MiddleLeft;
+        totals.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+        totals.ForeColor = Ui.Blue;
+        totals.BackColor = Color.FromArgb(236, 244, 241);
         rooms.ReadOnly = false;
         rooms.CurrentCellDirtyStateChanged += (_, _) => { if (rooms.IsCurrentCellDirty) rooms.CommitEdit(DataGridViewDataErrorContexts.Commit); };
         rooms.CellValueChanged += (_, _) => { if (!refreshing) { RememberSelection(); UpdateTotal(); } };
@@ -251,24 +279,25 @@ internal sealed class ServicesForm : Form
         MinimumSize = new Size(800, 500);
         var grid = Ui.Grid();
         var bar = Ui.Toolbar();
+        var actions = Ui.Toolbar();
         var choice = Ui.Lookup(service.Lookup(user, CatalogKind.Services));
         var quantity = Ui.Number(10000, 1, 1);
         quantity.Width = 90;
         void Refresh() => Ui.Bind(grid, service.Usages(user, bookingId));
-        bar.Controls.Add(Ui.Label("Dịch vụ"));
-        bar.Controls.Add(choice);
-        bar.Controls.Add(Ui.Label("Số lượng"));
-        bar.Controls.Add(quantity);
+        bar.Controls.Add(OperationalLayout.Field("Dịch vụ", choice));
+        bar.Controls.Add(OperationalLayout.Field("Số lượng", quantity));
         var editable = service.Booking(user, bookingId).Field<string>("Status") == "Đang ở";
         if (editable)
         {
             bar.Controls.Add(Ui.Button("Thêm", () => { service.AddService(user, bookingId, Ui.Value(choice), (int)quantity.Value); Refresh(); }, true));
-            bar.Controls.Add(Ui.Button("Sửa số lượng", () => { service.UpdateUsage(user, Ui.SelectedId(grid), (int)quantity.Value); Refresh(); }));
-            bar.Controls.Add(Ui.Button("Xóa dòng", () => { var id = Ui.SelectedId(grid); if (Ui.Confirm("Xóa dịch vụ đã chọn khỏi lượt lưu trú?")) { service.UpdateUsage(user, id, 0); Refresh(); } }));
+            actions.Controls.Add(Ui.Button("Sửa số lượng", () => { service.UpdateUsage(user, Ui.SelectedId(grid), (int)quantity.Value); Refresh(); }));
+            actions.Controls.Add(Ui.Button("Xóa dòng", () => { var id = Ui.SelectedId(grid); if (Ui.Confirm("Xóa dịch vụ đã chọn khỏi lượt lưu trú?")) { service.UpdateUsage(user, id, 0); Refresh(); } }));
         }
-        bar.Controls.Add(Ui.Button("Tải lại", Refresh));
+        actions.Controls.Add(Ui.Button("Tải lại", Refresh));
         grid.SelectionChanged += (_, _) => { if (grid.CurrentRow is not null && grid.Columns.Contains("Số lượng")) quantity.Value = Convert.ToDecimal(grid.CurrentRow.Cells["Số lượng"].Value); };
-        Controls.Add(Ui.Page(grid, bar));
+        var page = Ui.Page(grid, actions);
+        page.Controls.Add(bar);
+        Controls.Add(page);
         Refresh();
     }
 }
@@ -289,6 +318,7 @@ internal sealed class ChangeRoomForm : EditorForm
 {
     public ChangeRoomForm(HotelService service, Session user, int bookingId) : base($"Đổi phòng • Phiếu #{bookingId}", 450)
     {
+        MinimumSize = new Size(620, 540);
         var booking = service.Booking(user, bookingId);
         if (booking.Field<string>("Status") != "Đang ở")
             throw new InvalidOperationException("Chức năng đổi phòng dành cho khách đang ở.");
@@ -380,12 +410,14 @@ internal sealed class BookingsPage : Panel
         this.user = user;
         this.settings = settings;
         Dock = DockStyle.Fill;
+        search.Width = 280;
+        var filters = Ui.Toolbar();
+        filters.Controls.Add(OperationalLayout.Field("Tìm phiếu", search));
+        filters.Controls.Add(OperationalLayout.Field("Trạng thái", status));
+        filters.Controls.Add(Ui.Button("Tìm / tải lại", RefreshData));
         var bar = Ui.Toolbar();
-        bar.Controls.Add(search);
-        bar.Controls.Add(status);
-        bar.Controls.Add(Ui.Button("Tìm / tải lại", RefreshData));
         bar.Controls.Add(Ui.Button("Đặt phòng", () => { using var form = new BookingEditor(service, user); if (form.ShowDialog(this) == DialogResult.OK) { RefreshData(); Select(form.SavedId); } }, true));
-        bar.Controls.Add(Ui.Button("Nhận phòng nhanh", () => { using var form = new BookingEditor(service, user, walkIn: true); if (form.ShowDialog(this) == DialogResult.OK) { search.Clear(); status.SelectedItem = "Đang ở"; RefreshData(); Select(form.SavedId); } }, true));
+        bar.Controls.Add(Ui.Button("Nhận phòng nhanh", () => { using var form = new BookingEditor(service, user, walkIn: true); if (form.ShowDialog(this) == DialogResult.OK) { search.Clear(); status.SelectedItem = "Đang ở"; RefreshData(); Select(form.SavedId); } }));
         bar.Controls.Add(Ui.Button("Sửa phiếu", () => { var id = Selected(); if (service.Booking(user, id).Field<string>("Status") != "Đã đặt") throw new InvalidOperationException("Chỉ sửa phiếu chưa nhận phòng. Với khách đang ở, dùng Đổi phòng hoặc Đổi ngày đi."); using var form = new BookingEditor(service, user, id); if (form.ShowDialog(this) == DialogResult.OK) RefreshData(); }));
         bar.Controls.Add(Ui.Button("Nhận phòng", () => { var id = Selected(); if (Ui.Confirm($"Xác nhận nhận phòng cho phiếu #{id}?")) { service.CheckIn(user, id); RefreshData(); } }));
         bar.Controls.Add(Ui.Button("Dịch vụ", () => { using var form = new ServicesForm(service, user, Selected()); form.ShowDialog(this); }));
@@ -395,7 +427,9 @@ internal sealed class BookingsPage : Panel
         bar.Controls.Add(Ui.Button("Hủy đặt", () => { var id = Selected(); var b = service.Booking(user, id); if (b.Field<string>("Status") != "Đã đặt") throw new InvalidOperationException("Chỉ hủy được phiếu đang ở trạng thái Đã đặt."); if (Ui.Confirm($"Hủy phiếu #{id} và xác nhận đã hoàn toàn bộ tiền cọc {Ui.Currency(b.Field<decimal>("Deposit"))} cho khách?")) { service.CancelBooking(user, id); RefreshData(); } }));
         status.SelectedIndexChanged += (_, _) => Ui.Run(RefreshData);
         search.KeyDown += (_, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; Ui.Run(RefreshData); } };
-        Controls.Add(Ui.Page(grid, bar));
+        var page = Ui.Page(grid, bar);
+        page.Controls.Add(filters);
+        Controls.Add(page);
     }
     private int Selected() => Ui.SelectedId(grid);
     public void RefreshData() => Ui.Bind(grid, service.Bookings(user, search.Text, status.Text));

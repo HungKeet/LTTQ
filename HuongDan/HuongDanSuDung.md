@@ -20,23 +20,23 @@ Muốn tạo dữ liệu bằng SSMS: mở `CoSoDuLieu/CaiDat.sql`, kết nối 
 4. **Dịch vụ**: chọn phiếu đang ở, mở Dịch vụ, chọn dịch vụ và số lượng, bấm Thêm. Chọn dòng để Sửa số lượng hoặc Xóa dòng. Đơn giá được lưu tại thời điểm thêm.
 5. **Đổi ngày đi / Đổi phòng**: dùng cho phiếu đang ở. Đổi ngày giờ đi kiểm tra lịch các phòng trong khoảng lưu trú còn lại. Đổi phòng cho chọn phòng hiện tại và phòng mới đang sẵn sàng, đủ tổng sức chứa, không trùng lịch; giữ nguyên giá đã chốt của phòng cũ, cọc và dịch vụ. Phòng cũ chuyển Chờ dọn, nhật ký ghi lại phòng cũ/phòng mới. Với phiếu quá giờ trả, cần gia hạn ngày giờ đi trước khi đổi phòng.
 6. **Trả / thanh toán**: kiểm tra chi tiết, nhập phụ thu hoặc giảm giá; số tiền tự cập nhật. Giảm giá vượt tổng tiền sẽ báo ngay trên form và khóa xác nhận đến khi sửa hợp lệ. Dịch vụ lặp lại được gộp theo dịch vụ và giá/tên/đơn vị đã chốt; các mức giá khác nhau vẫn tách riêng. Xác nhận sau khi thực tế đã thu thêm hoặc hoàn khách đúng số tiền. Chương trình ghi nhận, không tự chuyển tiền.
-7. **Hóa đơn**: sau thanh toán, xem/in hóa đơn. Chọn In / lưu PDF và máy in Microsoft Print to PDF để lưu PDF nếu máy hỗ trợ. Xuất HTML để có tệp mở bằng trình duyệt. Tra cứu lại hóa đơn theo ngày, mã, tên hoặc điện thoại.
+7. **Hóa đơn**: sau thanh toán, chọn **Xem hóa đơn**. Chọn **Xuất Excel** để lưu tệp `.xlsx` hoặc **Xuất HTML** để lưu tệp mở bằng trình duyệt. Tra cứu lại hóa đơn theo ngày, mã, tên hoặc điện thoại; dùng **Xuất Excel danh sách** để lưu kết quả tra cứu.
 8. **Tổng quan phòng**: chọn Tầng và Loại phòng, rồi bấm trực tiếp các nút **Sẵn sàng / Đang ở / Chờ dọn / Bảo trì** để lọc; bấm **Tất cả** để bỏ lọc trạng thái. Các con số thống kê theo tầng và loại phòng đang chọn. Bộ lọc được giữ khi tải lại. Bấm vào nền, tên hoặc thông tin trên thẻ phòng (hoặc nút **Thao tác**) để mở các chức năng tương ứng: phòng sẵn sàng có Đặt phòng / Nhận phòng nhanh và được chọn sẵn; phòng đang ở có Dịch vụ / Đổi phòng / Đổi ngày đi / Trả và thanh toán; phòng chờ dọn có xác nhận đã dọn; quản lý có thể mở thông tin phòng để cập nhật bảo trì. Bấm **Đã dọn xong** sau khi nhân viên hoàn tất dọn phòng để chuyển phòng trở lại Sẵn sàng.
 9. **Hủy đặt**: chỉ cho phiếu Đã đặt; xác nhận đã hoàn toàn bộ tiền cọc. Không hủy trực tiếp phiếu đang ở/đã trả.
-10. **Thống kê**: chọn thời gian, loại báo cáo, Xem thống kê; có thể xuất CSV UTF-8. Tiền cọc là khoản đã thu trước, không cộng thêm lần nữa vào doanh thu.
+10. **Doanh thu**: chọn thời gian, loại báo cáo, Xem thống kê; có thể xuất CSV UTF-8. Tiền cọc là khoản đã thu trước, không cộng thêm lần nữa vào doanh thu.
 
 ## 3. Demo khoảng 10 phút
 
-- Đăng nhập quản lý, giới thiệu các tab và sơ đồ phòng.
+- Đăng nhập quản lý, giới thiệu menu bên trái và sơ đồ phòng. Các chức năng được chia thành Vận hành, Danh mục, Tài chính và Hệ thống; bộ lọc nằm phía trên các nút thao tác.
 - Mở Loại phòng, Phòng, Khách hàng để trình bày thêm/sửa/tìm kiếm.
 - Chọn khách mẫu, đặt phòng 101 từ hôm nay đến ngày mai, 2 khách, cọc 300.000 đ. Giá mẫu phòng 101 là 450.000 đ/đêm.
 - Thử đặt lại cùng phòng cùng thời gian: phòng không còn trong danh sách trống. Giải thích kiểm tra lại ở tầng nghiệp vụ.
 - Nhận phòng 101, thêm 2 chai nước suối × 10.000 đ.
 - Trả phòng trong cùng ngày: tối thiểu một đêm, tổng 470.000 đ, còn thu 170.000 đ. Không phụ thu/giảm giá trong ví dụ này.
-- Xem hóa đơn, xuất HTML hoặc xem bản in. Mở lại Hóa đơn để tra cứu.
+- Xem hóa đơn, xuất Excel hoặc HTML. Mở lại Hóa đơn để tra cứu.
 - Phòng 101 chuyển Chờ dọn, bấm Đã dọn xong.
 - Xem doanh thu 470.000 đ; giải thích vì sao không cộng thêm cọc 300.000 đ.
-- Đăng xuất, đăng nhập letan / Letan@123; chỉ ra các tab quản trị và thống kê bị giới hạn.
+- Đăng xuất, đăng nhập letan / Letan@123; chỉ ra các mục quản trị và doanh thu bị giới hạn.
 
 Để demo hoàn cọc, dùng một phiếu khác có tiền cọc lớn hơn tổng tiền. Để demo hủy, tạo phiếu ngày mai rồi hủy và kiểm tra cọc đã hoàn. Nên tạo mỗi kịch bản trên một phiếu riêng.
 
@@ -52,7 +52,7 @@ Muốn tạo dữ liệu bằng SSMS: mở `CoSoDuLieu/CaiDat.sql`, kết nối 
 | Sự kiện và điều hướng màn hình chính | `MaNguon/GiaoDien/FormChinh.cs` |
 | Biểu mẫu dùng chung cho các danh mục | `MaNguon/GiaoDien/FormDanhMuc.cs` |
 | Đặt phòng và dịch vụ | `MaNguon/GiaoDien/FormDatPhong.cs` |
-| Hóa đơn và in/xuất | `MaNguon/GiaoDien/FormHoaDon.cs` |
+| Xem hóa đơn và xuất Excel/HTML | `MaNguon/GiaoDien/FormHoaDon.cs` |
 
 ## 5. Câu hỏi thường gặp khi bảo vệ
 
@@ -79,7 +79,6 @@ Muốn tạo dữ liệu bằng SSMS: mở `CoSoDuLieu/CaiDat.sql`, kết nối 
 - Phòng không nhận được: xem có Chờ dọn/Bảo trì, khách cũ chưa trả hoặc phiếu đã quá hạn hay không.
 - Không xóa được danh mục: dữ liệu đã được sử dụng; bỏ chọn Hoạt động nếu quy tắc cho phép.
 - Mở bằng Visual Studio nhưng chạy sai project: đặt GiaoDien làm Startup Project.
-- In PDF: cần máy in Microsoft Print to PDF; nếu không có, xuất HTML và dùng chức năng in của trình duyệt.
 
 ## 7. Chạy lại kiểm thử và đóng gói
 

@@ -232,10 +232,11 @@ internal sealed class CatalogPage : Panel
         Dock = DockStyle.Fill;
 
         var bar = Ui.Toolbar();
-
-        bar.Controls.Add(search);
-
-        bar.Controls.Add(Ui.Button("Tìm / tải lại", RefreshData));
+        var filters = Ui.Toolbar();
+        search.Width = 270;
+        search.PlaceholderText = "Tìm " + Title(kind) + "...";
+        filters.Controls.Add(OperationalLayout.Field("Tra cứu", search));
+        filters.Controls.Add(Ui.Button("Tìm kiếm", RefreshData));
 
         bar.Controls.Add(Ui.Button("Xuất Excel", () => { if (grid.DataSource is not DataTable data || data.Rows.Count == 0) throw new InvalidOperationException("Chưa có dữ liệu để xuất."); XuatExcel.PromptExport(this, data, "DanhSach_" + Title(kind).Replace(" ", "") + "_" + DateTime.Now.ToString("yyyyMMdd") + ".xlsx", Title(kind)); }));
 
@@ -275,7 +276,9 @@ internal sealed class CatalogPage : Panel
 
         search.KeyDown += (_, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; Ui.Run(RefreshData); } };
 
-        Controls.Add(Ui.Page(grid, bar));
+        var page = Ui.Page(grid, bar);
+        page.Controls.Add(filters);
+        Controls.Add(page);
 
     }
 

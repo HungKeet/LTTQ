@@ -13,141 +13,117 @@ namespace Hotel.WinForms;
 
 
 internal sealed class MainForm : Form
-
 {
-
-    public bool LoggedOut
-
-    {
-
-        get; private set;
-
-    }
-
-    internal readonly TabControl Tabs = new() { Dock = DockStyle.Fill, Padding = new Point(14, 9), Multiline = true };
-
+    public bool LoggedOut { get; private set; }
+    internal readonly TabControl Tabs = new KhungNoiDung { Dock = DockStyle.Fill, Padding = Point.Empty };
     private readonly Dictionary<TabPage, Action> refreshers = new();
+    private readonly Dictionary<TabPage, Button> navigation = new();
+    private readonly Label pageTitle = new() { Dock = DockStyle.Top, Height = 32, UseMnemonic = false, Font = new Font("Segoe UI", 17F, FontStyle.Bold), ForeColor = Ui.DarkText };
+    private readonly Label pageHint = new() { Dock = DockStyle.Fill, ForeColor = Ui.Muted, Font = new Font("Segoe UI", 9F) };
+    private readonly Dictionary<TabPage, string> hints = new();
 
     public MainForm(HotelService service, Session user, AppSettings settings)
-
     {
-
-        Ui.Setup(this, "Hệ thống Quản trị khách sạn • " + settings.HotelName, 1180, 720);
-
+        Ui.Setup(this, "Hệ thống Quản trị khách sạn • " + settings.HotelName, 1260, 760);
         MinimumSize = new Size(1000, 640);
-
-        var top = new TableLayoutPanel { Dock = DockStyle.Top, Height = 76, ColumnCount = 2, BackColor = Color.White, Padding = new Padding(16, 10, 16, 10) };
-
+        var top = new TableLayoutPanel { Dock = DockStyle.Top, Height = 80, ColumnCount = 2, RowCount = 1, BackColor = Color.White, Padding = new Padding(20, 12, 16, 12) };
+        top.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        top.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 300));
+        var brand = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
+        var identity = new Panel { Dock = DockStyle.Fill, Padding = new Padding(14, 2, 0, 0) };
+        identity.Controls.Add(new Label { Text = user.FullName + "  •  " + user.Role, Dock = DockStyle.Fill, ForeColor = Ui.Muted, Font = new Font("Segoe UI", 9.5F) });
+        identity.Controls.Add(new Label { Text = settings.HotelName, Dock = DockStyle.Top, Height = 29, ForeColor = Ui.DarkText, Font = new Font("Segoe UI", 12F, FontStyle.Bold), AutoEllipsis = true });
+        brand.Controls.Add(identity);
+        brand.Controls.Add(new Label { Text = "NK", Dock = DockStyle.Left, Width = 50, BackColor = Ui.Slate, ForeColor = Color.White, Font = new Font("Segoe UI", 16F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleCenter });
+        top.Controls.Add(brand, 0, 0);
+        var accountActions = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(0, 4, 0, 0) };
+        accountActions.Controls.Add(Ui.Button("Đăng xuất", () => { LoggedOut = true; Close(); }));
+        accountActions.Controls.Add(Ui.Button("Đổi mật khẩu", () => { using var f = new PasswordForm(service, user); f.ShowDialog(this); }));
+        top.Controls.Add(accountActions, 1, 0);
+        top.Paint += (_, e) => { using var pen = new Pen(Ui.Border); e.Graphics.DrawLine(pen, 0, top.Height - 1, top.Width, top.Height - 1); };
 
-        top.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 280));
-
-        top.Controls.Add(new Label { Text = $"{settings.HotelName} — {(user.Role == "Quản lý" ? "BÀN LÀM VIỆC QUẢN LÝ" : "BÀN LÀM VIỆC")}\n{user.FullName} • Vai trò: {user.Role}", Dock = DockStyle.Fill, ForeColor = Ui.DarkText, Font = new Font("Segoe UI", 12, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft });
-
-        var actions = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = false };
-
-        actions.Controls.Add(Ui.Button("Đổi mật khẩu", () => { using var f = new PasswordForm(service, user); f.ShowDialog(this); }));
-
-        actions.Controls.Add(Ui.Button("Đăng xuất", () => { LoggedOut = true; Close(); }));
-
-        top.Controls.Add(actions);
-
-        var divider = new Panel { Dock = DockStyle.Top, Height = 1, BackColor = Color.FromArgb(226, 232, 240) };
-
-        var status = new Label { Dock = DockStyle.Bottom, Height = 30, Text = "  Hệ thống quản lý khách sạn • Quản lý phòng • Doanh thu (Biểu đồ) • Hóa đơn • Quản lý tài khoản", ForeColor = Color.FromArgb(100, 116, 139), BackColor = Color.White, TextAlign = ContentAlignment.MiddleLeft };
-
-        var statusDivider = new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = Color.FromArgb(226, 232, 240) };
-
-        void Page(string title, Control panel, Action refresh)
-
+        var menu = new FlowLayoutPanel { Dock = DockStyle.Left, Width = 212, BackColor = Color.White, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true, Padding = new Padding(10, 12, 8, 12) };
+        var content = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12, 0, 12, 10), BackColor = Ui.Background };
+        var pageHeading = new Panel { Dock = DockStyle.Top, Height = 76, Padding = new Padding(14, 12, 4, 4) };
+        pageHeading.Controls.Add(pageHint);
+        pageHeading.Controls.Add(pageTitle);
+        content.Controls.Add(Tabs);
+        content.Controls.Add(pageHeading);
+        var body = new Panel { Dock = DockStyle.Fill };
+        body.Controls.Add(content);
+        body.Controls.Add(menu);
+        var status = new Label { Dock = DockStyle.Bottom, Height = 28, Padding = new Padding(18, 0, 12, 0), Text = $"Ngọc Khoa  /  {user.Role}                                      {DateTime.Today:dd/MM/yyyy}", Font = new Font("Segoe UI", 8.5F), ForeColor = Ui.Muted, BackColor = Color.White, TextAlign = ContentAlignment.MiddleLeft };
+        void Section(string name) => menu.Controls.Add(new Label { Text = name, AutoSize = false, Width = 164, Height = 20, Margin = new Padding(10, 6, 0, 0), ForeColor = Ui.Muted, Font = new Font("Segoe UI", 8F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft });
+        void Page(string title, string hint, Control panel, Action refresh)
         {
-
-            var tab = new TabPage(title);
-
+            var tab = new TabPage(title) { BackColor = Ui.Background, Padding = Padding.Empty };
             tab.Controls.Add(panel);
-
             Tabs.TabPages.Add(tab);
-
             refreshers[tab] = refresh;
-
+            hints[tab] = hint;
+            var button = new Button { Text = title, UseMnemonic = false, Width = 174, Height = 37, FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = Ui.DarkText, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(12, 0, 4, 0), Margin = new Padding(0, 1, 0, 1), Cursor = Cursors.Hand, Font = new Font("Segoe UI", 9.5F), AccessibleName = title };
+            button.FlatAppearance.BorderSize = 0;
+            button.FlatAppearance.MouseOverBackColor = Ui.SoftAccent;
+            button.FlatAppearance.MouseDownBackColor = Color.FromArgb(211, 229, 224);
+            button.Click += (_, _) => Tabs.SelectedTab = tab;
+            button.Paint += (_, e) => { if (Tabs.SelectedTab == tab) { using var brush = new SolidBrush(Ui.Slate); e.Graphics.FillRectangle(brush, 0, 7, 3, button.Height - 14); } };
+            navigation[tab] = button;
+            menu.Controls.Add(button);
         }
-
-
-
-        // 1. Quản lý phòng & Đặt phòng
+        Section("VẬN HÀNH");
         var dashboard = new DashboardPage(service, user, settings);
-        Page("Sơ đồ phòng", dashboard, dashboard.RefreshData);
-
+        Page("Sơ đồ phòng", "Theo dõi tình trạng phòng và thao tác tại quầy.", dashboard, dashboard.RefreshData);
         var bookings = new BookingsPage(service, user, settings);
-        Page("Quản lý đặt phòng", bookings, bookings.RefreshData);
-
+        Page("Đặt phòng & lưu trú", "Tra cứu phiếu đặt, nhận phòng và xử lý lưu trú.", bookings, bookings.RefreshData);
+        Section("DANH MỤC");
         var roomsPage = new CatalogPage(service, user, CatalogKind.Rooms);
-        Page("Quản lý phòng", roomsPage, roomsPage.RefreshData);
-
+        Page("Phòng", "Quản lý danh sách phòng và tình trạng vận hành.", roomsPage, roomsPage.RefreshData);
         var roomTypesPage = new CatalogPage(service, user, CatalogKind.RoomTypes);
-        Page("Loại phòng & Giá", roomTypesPage, roomTypesPage.RefreshData);
-
+        Page("Loại phòng & giá", "Cập nhật sức chứa và giá phòng theo từng loại.", roomTypesPage, roomTypesPage.RefreshData);
         var customersPage = new CatalogPage(service, user, CatalogKind.Customers);
-        Page("Khách hàng", customersPage, customersPage.RefreshData);
-
+        Page("Khách hàng", "Thông tin liên hệ, giấy tờ và lịch sử lưu trú.", customersPage, customersPage.RefreshData);
         var servicesPage = new CatalogPage(service, user, CatalogKind.Services);
-        Page("Dịch vụ", servicesPage, servicesPage.RefreshData);
-
-        // 2. Quản lý hóa đơn
+        Page("Dịch vụ", "Quản lý các dịch vụ và đơn giá đang áp dụng.", servicesPage, servicesPage.RefreshData);
+        Section("TÀI CHÍNH");
         var invoices = new InvoicesPage(service, user, settings);
-        Page("Quản lý hóa đơn", invoices, invoices.RefreshData);
-
-        // 3. Quản lý doanh thu & Hệ thống (Dành cho Quản lý)
+        Page("Hóa đơn", "Tra cứu hóa đơn, xem chi tiết và xuất Excel hoặc HTML.", invoices, invoices.RefreshData);
         if (user.Role == "Quản lý")
         {
             var reports = new ReportsPage(service, user);
-            Page("Báo cáo doanh thu", reports, reports.RefreshData);
-
+            Page("Doanh thu", "Theo dõi doanh thu theo thời gian và dịch vụ.", reports, reports.RefreshData);
+            Section("HỆ THỐNG");
             var usersPage = new CatalogPage(service, user, CatalogKind.Users);
-            Page("Quản lý tài khoản", usersPage, usersPage.RefreshData);
-
+            Page("Tài khoản", "Quản lý tài khoản truy cập và phân quyền.", usersPage, usersPage.RefreshData);
             var employeesPage = new CatalogPage(service, user, CatalogKind.Employees);
-            Page("Nhân viên", employeesPage, employeesPage.RefreshData);
-
+            Page("Nhân viên", "Quản lý thông tin nhân viên khách sạn.", employeesPage, employeesPage.RefreshData);
             var auditGrid = Ui.Grid();
             var auditBar = Ui.Toolbar();
             void RefreshAudit() => Ui.Bind(auditGrid, service.AuditHistory(user));
             auditBar.Controls.Add(Ui.Label("500 thao tác gần nhất"));
             auditBar.Controls.Add(Ui.Button("Tải lại", RefreshAudit));
-            Page("Nhật ký", Ui.Page(auditGrid, auditBar), RefreshAudit);
+            Page("Nhật ký", "Lịch sử các thao tác gần đây trên hệ thống.", Ui.Page(auditGrid, auditBar), RefreshAudit);
         }
-
-
-
         Tabs.SelectedIndexChanged += (_, _) => Ui.Run(RefreshSelected);
-
-        Controls.Add(Tabs);
-
-        Controls.Add(divider);
-
+        Controls.Add(body);
         Controls.Add(top);
-
-        Controls.Add(statusDivider);
-
         Controls.Add(status);
-
         Shown += (_, _) => Ui.Run(RefreshSelected);
-
     }
-
     internal void RefreshSelected()
-
     {
-
-        if (Tabs.SelectedTab is { } tab)
-
-            refreshers[tab]();
-
+        if (Tabs.SelectedTab is not { } tab) return;
+        pageTitle.Text = tab.Text;
+        pageHint.Text = hints[tab];
+        foreach (var (page, button) in navigation)
+        {
+            button.BackColor = page == tab ? Ui.SoftAccent : Color.White;
+            button.ForeColor = page == tab ? Ui.Slate : Ui.DarkText;
+            button.Invalidate();
+        }
+        refreshers[tab]();
     }
-
 }
-
-
 
 internal sealed class PasswordForm : EditorForm
 
@@ -199,12 +175,10 @@ internal sealed class DashboardPage : Panel
         this.settings = settings;
         Dock = DockStyle.Fill;
         var bar = Ui.Toolbar();
-        bar.Controls.Add(Ui.Label("Tầng"));
         floor.Width = 100;
-        bar.Controls.Add(floor);
-        bar.Controls.Add(Ui.Label("Loại phòng"));
         roomType.Width = 210;
-        bar.Controls.Add(roomType);
+        bar.Controls.Add(OperationalLayout.Field("Tầng", floor));
+        bar.Controls.Add(OperationalLayout.Field("Loại phòng", roomType));
         bar.Controls.Add(Ui.Button("Tải lại phòng", RefreshData, true));
         var statistics = Ui.Toolbar();
         statistics.Dock = DockStyle.Fill;
@@ -269,8 +243,8 @@ internal sealed class DashboardPage : Panel
         {
             button.Text = status == "Tất cả" ? $"Tất cả: {scope.Length} phòng" : $"{status}: {counts.GetValueOrDefault(status)}";
             var selected = selectedStatus == status;
-            button.BackColor = selected ? Ui.Slate : Color.White;
-            button.ForeColor = selected ? Color.White : Ui.DarkText;
+            button.BackColor = selected ? Ui.SoftAccent : Color.White;
+            button.ForeColor = selected ? Ui.Slate : Ui.DarkText;
             button.FlatAppearance.BorderColor = selected ? Ui.Slate : Color.FromArgb(203, 213, 225);
             button.AccessibleName = button.Text + (selected ? ", đang lọc" : ", bấm để lọc");
         }
@@ -294,12 +268,12 @@ internal sealed class DashboardPage : Panel
                 var overdue = !r.IsNull("Dự kiến trả") && r.Field<DateTime>("Dự kiến trả") < DateTime.Now;
                 var color = status switch
                 {
-                    "Đang ở" => Color.FromArgb(241, 245, 249),
+                    "Đang ở" => Color.FromArgb(235, 242, 246),
                     "Chờ dọn" => Color.FromArgb(254, 249, 235),
                     "Bảo trì" => Color.FromArgb(254, 242, 242),
-                    _ => Color.FromArgb(240, 253, 244)
+                    _ => Color.FromArgb(235, 244, 238)
                 };
-                var card = new Panel { Size = new Size(278, 248), BackColor = color, Margin = new Padding(8), Padding = new Padding(12), Cursor = Cursors.Hand, Tag = roomId, AccessibleName = $"Phòng {r["Số phòng"]}, {status}. Mở thao tác phòng." };
+                var card = new Panel { Size = new Size(266, 230), BackColor = color, Margin = new Padding(8), Padding = new Padding(12), Cursor = Cursors.Hand, Tag = roomId, AccessibleName = $"Phòng {r["Số phòng"]}, {status}. Mở thao tác phòng." };
                 var title = new Label { Text = $"Phòng {r["Số phòng"]} • {status}", Dock = DockStyle.Top, Height = 44, AutoEllipsis = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = Ui.DarkText };
                 var detail = new Label { Dock = DockStyle.Fill, Text = $"{r["Loại phòng"]} • Tầng {r["Tầng"]} • {r["Sức chứa"]} khách\n{Ui.Currency(r.Field<decimal>("Giá / đêm"))} / đêm\n" + (r.IsNull("Khách đang ở") ? "Phòng trống" : $"Khách: {r["Khách đang ở"]}\nTrả dự kiến: {r.Field<DateTime>("Dự kiến trả"):dd/MM HH:mm}\n" + (overdue ? "QUÁ HẠN TRẢ PHÒNG" : "")), Padding = new Padding(0, 5, 0, 0) };
                 card.Controls.Add(detail);
@@ -406,7 +380,7 @@ internal sealed class BarChartControl : Panel
 
         using var barBrush = new SolidBrush(Color.FromArgb(51, 65, 85));
 
-        using var barAccentBrush = new SolidBrush(Color.FromArgb(37, 99, 235));
+        using var barAccentBrush = new SolidBrush(Ui.Slate);
 
 
 
@@ -538,7 +512,7 @@ internal sealed class ReportsPage : Panel
 
     private readonly BarChartControl chart = new();
 
-    private readonly Label summary = new() { Dock = DockStyle.Bottom, Height = 60, Padding = new Padding(12), Font = new Font("Segoe UI", 11, FontStyle.Bold) };
+    private readonly Label summary = new() { Dock = DockStyle.Bottom, Height = 78, Padding = new Padding(12), BackColor = Ui.SoftAccent, Font = new Font("Segoe UI", 10, FontStyle.Bold) };
 
     private readonly DateTimePicker from = Ui.Date(new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1)), to = Ui.Date(DateTime.Today);
 
@@ -558,23 +532,19 @@ internal sealed class ReportsPage : Panel
 
         var bar = Ui.Toolbar();
 
-        bar.Controls.Add(Ui.Label("Từ"));
-
-        bar.Controls.Add(from);
-
-        bar.Controls.Add(Ui.Label("Đến"));
-
-        bar.Controls.Add(to);
+        bar.Controls.Add(OperationalLayout.Field("Từ ngày", from));
+        bar.Controls.Add(OperationalLayout.Field("Đến ngày", to));
 
         mode.Width = 220;
 
         bar.Controls.Add(mode);
+        var exports = Ui.Toolbar();
 
         bar.Controls.Add(Ui.Button("Xem thống kê", RefreshData, true));
 
-        bar.Controls.Add(Ui.Button("Xuất Excel", () => { if (grid.DataSource is not DataTable data || data.Rows.Count == 0) throw new InvalidOperationException("Chưa có dữ liệu để xuất."); XuatExcel.PromptExport(this, data, "ThongKeDoanhThu_" + DateTime.Now.ToString("yyyyMMdd") + ".xlsx", "DoanhThu"); }));
+        exports.Controls.Add(Ui.Button("Xuất Excel", () => { if (grid.DataSource is not DataTable data || data.Rows.Count == 0) throw new InvalidOperationException("Chưa có dữ liệu để xuất."); XuatExcel.PromptExport(this, data, "ThongKeDoanhThu_" + DateTime.Now.ToString("yyyyMMdd") + ".xlsx", "DoanhThu"); }));
 
-        bar.Controls.Add(Ui.Button("Xuất CSV", () => { if (grid.DataSource is not DataTable data || data.Rows.Count == 0) throw new InvalidOperationException("Chưa có dữ liệu để xuất."); using var dialog = new SaveFileDialog { Filter = "CSV UTF-8|*.csv", FileName = "ThongKe_" + DateTime.Now.ToString("yyyyMMdd") + ".csv" }; if (dialog.ShowDialog(this) == DialogResult.OK) { File.WriteAllText(dialog.FileName, Csv(data), new UTF8Encoding(true)); Ui.Info("Đã xuất thống kê."); } }));
+        exports.Controls.Add(Ui.Button("Xuất CSV", () => { if (grid.DataSource is not DataTable data || data.Rows.Count == 0) throw new InvalidOperationException("Chưa có dữ liệu để xuất."); using var dialog = new SaveFileDialog { Filter = "CSV UTF-8|*.csv", FileName = "ThongKe_" + DateTime.Now.ToString("yyyyMMdd") + ".csv" }; if (dialog.ShowDialog(this) == DialogResult.OK) { File.WriteAllText(dialog.FileName, Csv(data), new UTF8Encoding(true)); Ui.Info("Đã xuất thống kê."); } }));
 
 
 
@@ -598,8 +568,9 @@ internal sealed class ReportsPage : Panel
 
 
 
+        Padding = new Padding(12);
         Controls.Add(split);
-
+        Controls.Add(exports);
         Controls.Add(bar);
 
         Controls.Add(summary);

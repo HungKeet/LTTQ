@@ -2,7 +2,9 @@
 
 Bài tập lớn môn Lập trình trực quan, sử dụng **C# Windows Forms, .NET 10 và SQL Server**. Ứng dụng có giao diện tiếng Việt, quản lý phòng, khách hàng, đặt phòng, nhận/trả phòng, dịch vụ, hóa đơn, tài khoản và doanh thu.
 
-![Màn hình tổng quan Khách sạn Ngọc Khoa](KetQua/GiaoDien/02-ManHinhChinh-00.png)
+Giao diện dùng màu phẳng trắng, xám sáng và xanh trầm, không dùng gradient hay neon. Menu bên trái chia theo nghiệp vụ; thanh tìm kiếm/bộ lọc tách khỏi nhóm nút thao tác để dễ sử dụng.
+
+![Màn hình tổng quan Khách sạn Ngọc Khoa](KetQua/GiaoDien/SoDoPhong.png)
 
 ## 1. Chuẩn bị
 
@@ -111,6 +113,8 @@ Các tài khoản trên được tạo khi khởi tạo dữ liệu mẫu. Nếu
 
 Quy trình thử: **Khách hàng → Đặt phòng → Nhận phòng → Thêm dịch vụ → Trả / thanh toán → Xem hóa đơn → Xác nhận đã dọn phòng**. Tài khoản quản lý có thể xem thống kê doanh thu và quản lý danh mục, nhân viên, tài khoản.
 
+Trong màn hình **Xem hóa đơn**, chọn **Xuất Excel** để lưu tệp `.xlsx` hoặc **Xuất HTML** để lưu tệp mở bằng trình duyệt. Màn hình tra cứu hóa đơn có **Xuất Excel danh sách**.
+
 Xem [hướng dẫn thao tác và kịch bản demo](HuongDan/HuongDanSuDung.md) để làm từng bước.
 
 ## 6. Cấu trúc mã nguồn
@@ -147,7 +151,7 @@ dotnet test .\KiemThu\KiemThuKhachSan\KiemThuKhachSan.csproj -c Release
 
 Các database kiểm thử được giữ để kiểm tra kết quả, có thể xóa thủ công trong SSMS khi không cần. Bộ kiểm thử hiện có **56 trường hợp**.
 
-Bản nâng cấp đã được kiểm tra ngày **25/10/2026** bằng SDK **10.0.400**: biên dịch Release **0 lỗi, 0 cảnh báo**, **32/32 kiểm thử đạt** trên .NET 10. Bản EXE Windows x64 kèm runtime **10.0.11** đã chạy kiểm tra giao diện với 22 ảnh các màn hình, xuất hóa đơn HTML và in hóa đơn PDF. Kiểm tra gói NuGet, gồm cả phụ thuộc gián tiếp, không còn cảnh báo lỗ hổng từ nguồn NuGet tại thời điểm kiểm tra.
+Bản nâng cấp đã được kiểm tra ngày **25/10/2026** bằng SDK **10.0.400**: biên dịch Release **0 lỗi, 0 cảnh báo**, **32/32 kiểm thử đạt** trên .NET 10. Bản EXE Windows x64 kèm runtime **10.0.11** đã chạy kiểm tra giao diện với 22 ảnh các màn hình và xuất hóa đơn HTML. Kiểm tra gói NuGet, gồm cả phụ thuộc gián tiếp, không còn cảnh báo lỗ hổng từ nguồn NuGet tại thời điểm kiểm tra.
 
 Bản sửa nghiệp vụ ngày **26/10/2026** đã biên dịch Release **0 lỗi, 0 cảnh báo** bằng SDK **10.0.403**, **56/56 kiểm thử đạt** trên SQL Server cục bộ với database kiểm thử riêng. Các ca mới kiểm tra lịch tương lai khi khách quá giờ trả, giờ nhận thực tế, đặt cùng ngày, đổi phòng, nhận phòng nhanh, giao dịch đồng thời, rollback và gộp dịch vụ có nhiều mức giá. Xem [hướng dẫn sử dụng](HuongDan/HuongDanSuDung.md) cho các thao tác mới. Thời gian đến/đi cùng ngày được hỗ trợ, giá hiện tại vẫn tối thiểu một đêm; chưa có bảng giá riêng theo giờ.
 
@@ -157,7 +161,7 @@ Bản sửa nghiệp vụ ngày **26/10/2026** đã biên dịch Release **0 l�
 .\BanChay\QuanLyKhachSan.exe --ui-smoke --out .\KetQua\GiaoDienKiemTra
 ```
 
-Chế độ này tạo database kiểm tra riêng, lưu ảnh và `KetQua.txt`; nếu lỗi, xem `Loi.txt`. PDF được tạo khi máy có máy in **Microsoft Print to PDF**.
+Chế độ này tạo database kiểm tra riêng, lưu ảnh, hóa đơn `HoaDon.html` và `KetQua.txt`; nếu lỗi, xem `Loi.txt`.
 
 ## 8. Lỗi thường gặp
 

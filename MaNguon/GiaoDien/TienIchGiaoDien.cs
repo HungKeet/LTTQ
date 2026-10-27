@@ -5,23 +5,61 @@ namespace Hotel.WinForms;
 
 internal static class Ui
 {
-    public static readonly Color DarkText = Color.FromArgb(30, 41, 59), Slate = Color.FromArgb(51, 65, 85), Background = Color.FromArgb(248, 250, 252);
-    public static readonly Color Navy = DarkText, Blue = Slate;
+    public static readonly Color DarkText = Color.FromArgb(35, 49, 59), Slate = Color.FromArgb(45, 95, 91), Background = Color.FromArgb(244, 247, 248);
+    public static readonly Color Navy = DarkText, Blue = Slate, Border = Color.FromArgb(221, 229, 232), Muted = Color.FromArgb(105, 120, 128), SoftAccent = Color.FromArgb(230, 241, 238);
     public static void Setup(Form form, string title, int width = 1100, int height = 720)
     {
         form.Text = title;
         form.Font = new Font("Segoe UI", 10F);
         form.AutoScaleMode = AutoScaleMode.None;
         form.StartPosition = FormStartPosition.CenterScreen;
-        form.ClientSize = new Size(width, height);
+        var area = Screen.FromPoint(Cursor.Position).WorkingArea;
+        form.ClientSize = new Size(Math.Min(width, area.Width - 48), Math.Min(height, area.Height - 72));
         form.BackColor = Background;
+        form.ForeColor = DarkText;
     }
     public static Button Button(string text, Action action, bool primary = false)
     {
-        var b = new Button { Text = text, AutoSize = true, MinimumSize = new Size(95, 34), Height = 36, Padding = new Padding(12, 4, 12, 4), Margin = new Padding(4), FlatStyle = FlatStyle.Flat, BackColor = primary ? Slate : Color.White, ForeColor = primary ? Color.White : DarkText, UseVisualStyleBackColor = false };
-        b.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
+        var b = new Button { Text = text, UseMnemonic = false, AutoSize = true, MinimumSize = new Size(86, 38), Height = 38, Padding = new Padding(12, 4, 12, 4), Margin = new Padding(4, 3, 4, 3), FlatStyle = FlatStyle.Flat, BackColor = primary ? Slate : Color.White, ForeColor = primary ? Color.White : DarkText, UseVisualStyleBackColor = false, Cursor = Cursors.Hand, Font = new Font("Segoe UI", 9.5F, primary ? FontStyle.Bold : FontStyle.Regular), TextImageRelation = TextImageRelation.ImageBeforeText };
+        b.FlatAppearance.BorderColor = primary ? Slate : Border;
+        b.FlatAppearance.MouseOverBackColor = primary ? Color.FromArgb(36, 80, 77) : SoftAccent;
+        b.FlatAppearance.MouseDownBackColor = primary ? Color.FromArgb(29, 67, 64) : Color.FromArgb(211, 229, 224);
+        var icon = ButtonIcon(text, primary ? Color.White : Slate);
+        var disabledIcon = icon is null ? null : ButtonIcon(text, Muted);
+        if (icon is not null)
+        {
+            b.Image = icon;
+            b.Disposed += (_, _) => { icon.Dispose(); disabledIcon?.Dispose(); };
+        }
+        b.EnabledChanged += (_, _) =>
+        {
+            b.BackColor = b.Enabled ? (primary ? Slate : Color.White) : Color.FromArgb(235, 239, 241);
+            b.ForeColor = b.Enabled ? (primary ? Color.White : DarkText) : Muted;
+            b.FlatAppearance.BorderColor = b.Enabled && primary ? Slate : Border;
+            if (icon is not null) b.Image = b.Enabled ? icon : disabledIcon;
+        };
         b.Click += (_, _) => Run(action);
         return b;
+    }
+    private static Bitmap? ButtonIcon(string text, Color color)
+    {
+        var kind = text.StartsWith("Tìm") ? "search" : text.StartsWith("Thêm") ? "add" : text.StartsWith("Sửa") ? "edit" : text.StartsWith("Xóa") ? "delete" : text.StartsWith("Xuất") ? "export" : text.StartsWith("Tải") ? "reload" : text.StartsWith("Lưu") ? "save" : "";
+        if (kind.Length == 0) return null;
+        var icon = new Bitmap(20, 18);
+        using var g = Graphics.FromImage(icon);
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        using var pen = new Pen(color, 1.6F) { StartCap = System.Drawing.Drawing2D.LineCap.Round, EndCap = System.Drawing.Drawing2D.LineCap.Round };
+        switch (kind)
+        {
+            case "search": g.DrawEllipse(pen, 2, 2, 9, 9); g.DrawLine(pen, 10, 10, 15, 15); break;
+            case "add": g.DrawLine(pen, 8, 3, 8, 15); g.DrawLine(pen, 2, 9, 14, 9); break;
+            case "edit": g.DrawLines(pen, new Point[] { new Point(3, 12), new Point(12, 3), new Point(15, 6), new Point(6, 15), new Point(3, 15), new Point(3, 12) }); break;
+            case "delete": g.DrawLine(pen, 3, 5, 15, 5); g.DrawRectangle(pen, 6, 2, 6, 3); g.DrawLines(pen, new Point[] { new Point(4, 6), new Point(5, 15), new Point(13, 15), new Point(14, 6) }); break;
+            case "export": g.DrawLine(pen, 9, 2, 9, 11); g.DrawLines(pen, new Point[] { new Point(5, 7), new Point(9, 11), new Point(13, 7) }); g.DrawLines(pen, new Point[] { new Point(3, 11), new Point(3, 15), new Point(15, 15), new Point(15, 11) }); break;
+            case "reload": g.DrawArc(pen, 3, 3, 12, 12, 35, 295); g.DrawLines(pen, new Point[] { new Point(11, 2), new Point(15, 4), new Point(15, 0) }); break;
+            case "save": g.DrawRectangle(pen, 3, 2, 12, 14); g.DrawRectangle(pen, 6, 2, 6, 5); g.DrawRectangle(pen, 6, 10, 6, 6); break;
+        }
+        return icon;
     }
     public static void Run(Action action)
     {
@@ -78,12 +116,16 @@ internal static class Ui
             MultiSelect = false,
             RowHeadersVisible = false,
             AutoGenerateColumns = true,
-            RowTemplate = { Height = 32 },
-            ColumnHeadersHeight = 36,
+            RowTemplate = { Height = 38 },
+            ColumnHeadersHeight = 42,
+            ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing,
+            CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
+            ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None,
+            GridColor = Border,
             EnableHeadersVisualStyles = false,
-            ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(241, 245, 249), ForeColor = DarkText, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold) },
+            ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(236, 242, 243), ForeColor = DarkText, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Padding = new Padding(9, 5, 9, 5), SelectionBackColor = Color.FromArgb(236, 242, 243) },
             AlternatingRowsDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(250, 251, 252) },
-            DefaultCellStyle = new DataGridViewCellStyle { SelectionBackColor = Color.FromArgb(226, 232, 240), SelectionForeColor = Color.Black, Padding = new Padding(4) }
+            DefaultCellStyle = new DataGridViewCellStyle { SelectionBackColor = SoftAccent, SelectionForeColor = DarkText, Padding = new Padding(9, 5, 9, 5), ForeColor = DarkText }
         };
         grid.DataBindingComplete += (_, _) => FormatColumns(grid);
         return grid;
@@ -113,13 +155,13 @@ internal static class Ui
         }
     }
     public static int SelectedId(DataGridView grid) => grid.CurrentRow is { IsNewRow: false } row ? Convert.ToInt32(row.Cells["Id"].Value) : throw new InvalidOperationException("Hãy chọn một dòng trong danh sách.");
-    public static FlowLayoutPanel Toolbar() => new() { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(8), WrapContents = true, BackColor = Color.FromArgb(248, 250, 252) };
-    public static Label Label(string text) => new() { Text = text, AutoSize = true, Margin = new Padding(6, 10, 6, 4), ForeColor = DarkText };
-    public static TextBox Search(string placeholder = "Tìm theo tên, mã...") => new() { Width = 220, PlaceholderText = placeholder, Margin = new Padding(4, 7, 4, 4) };
-    public static DateTimePicker Date(DateTime value) => new() { Value = value, Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy", Width = 140, Margin = new Padding(4, 7, 4, 4) };
+    public static FlowLayoutPanel Toolbar() => new ThanhCongCu();
+    public static Label Label(string text) => new() { Text = text, UseMnemonic = false, AutoSize = true, Margin = new Padding(6, 11, 6, 4), ForeColor = Muted };
+    public static TextBox Search(string placeholder = "Tìm theo tên, mã...") => new() { Width = 230, PlaceholderText = placeholder, Margin = new Padding(4, 8, 4, 5), BorderStyle = BorderStyle.FixedSingle };
+    public static DateTimePicker Date(DateTime value) => new() { Value = value, Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy", Width = 140, Margin = new Padding(4, 8, 4, 5) };
     public static ComboBox Choices(params string[] values)
     {
-        var combo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 155, Margin = new Padding(4, 7, 4, 4) };
+        var combo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 155, Margin = new Padding(4, 8, 4, 5) };
         combo.Items.AddRange(values);
         if (values.Length > 0)
             combo.SelectedIndex = 0;
@@ -137,29 +179,80 @@ internal static class Ui
     public static string Currency(decimal value) => value.ToString("N0") + " đ";
     public static Panel Page(DataGridView grid, FlowLayoutPanel bar)
     {
-        var p = new Panel { Dock = DockStyle.Fill, Padding = new Padding(8) };
+        var p = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12), BackColor = Background };
         p.Controls.Add(grid);
         p.Controls.Add(bar);
         return p;
     }
 }
 
+internal sealed class ThanhCongCu : FlowLayoutPanel
+{
+    public ThanhCongCu()
+    {
+        Dock = DockStyle.Top;
+        AutoSize = true;
+        AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        Padding = new Padding(10, 9, 10, 10);
+        Margin = Padding.Empty;
+        WrapContents = true;
+        BackColor = Color.White;
+        DoubleBuffered = true;
+    }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+        using var pen = new Pen(Ui.Border);
+        e.Graphics.DrawLine(pen, 0, Height - 1, Width, Height - 1);
+    }
+}
+
+internal sealed class KhungNoiDung : TabControl
+{
+    public KhungNoiDung()
+    {
+        Appearance = TabAppearance.FlatButtons;
+        SizeMode = TabSizeMode.Fixed;
+        ItemSize = new Size(1, 1);
+        Multiline = true;
+    }
+    protected override void WndProc(ref Message m)
+    {
+        // Noi dung chuyen bang thanh dieu huong ben trai, an hang tab goc.
+        if (m.Msg == 0x1328 && !DesignMode) { m.Result = (IntPtr)1; return; }
+        base.WndProc(ref m);
+    }
+}
+
 internal class EditorForm : Form
 {
-    protected readonly TableLayoutPanel Fields = new() { Dock = DockStyle.Fill, AutoScroll = true, ColumnCount = 2, Padding = new Padding(16) };
-    protected readonly FlowLayoutPanel Actions = new() { Dock = DockStyle.Bottom, Height = 58, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(8) };
+    protected readonly TableLayoutPanel Fields = new() { Dock = DockStyle.Fill, AutoScroll = true, ColumnCount = 2, Padding = new Padding(20), BackColor = Color.White };
+    protected readonly FlowLayoutPanel Actions = new() { Dock = DockStyle.Bottom, Height = 68, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(12, 10, 12, 10), BackColor = Color.White };
+    private readonly Label heading = new() { Dock = DockStyle.Top, Height = 30, Font = new Font("Segoe UI", 13, FontStyle.Bold), ForeColor = Ui.DarkText };
+    private readonly Label description = new() { Dock = DockStyle.Fill, ForeColor = Ui.Muted, Font = new Font("Segoe UI", 9F) };
     public EditorForm(string title, int height = 500)
     {
-        Ui.Setup(this, title, 620, height);
+        Ui.Setup(this, title, 660, height + 64);
         MinimumSize = new Size(580, 400);
         MaximizeBox = false;
+        var header = new Panel { Dock = DockStyle.Top, Height = 76, Padding = new Padding(24, 12, 24, 8), BackColor = Ui.Background };
+        header.Controls.Add(description);
+        header.Controls.Add(heading);
+        SetHeading(title, "Các mục có dấu * là thông tin bắt buộc.");
         Fields.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 175));
         Fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         Controls.Add(Fields);
         Controls.Add(Actions);
+        Controls.Add(header);
+        Actions.Paint += (_, e) => { using var pen = new Pen(Ui.Border); e.Graphics.DrawLine(pen, 0, 0, Actions.Width, 0); };
         var cancel = Ui.Button("Đóng", () => Close());
         Actions.Controls.Add(cancel);
         CancelButton = cancel;
+    }
+    protected void SetHeading(string title, string subtitle)
+    {
+        heading.Text = title;
+        description.Text = subtitle;
     }
     protected void AddField(string label, Control control, int height = 44)
     {
@@ -169,6 +262,8 @@ internal class EditorForm : Form
         text.Dock = DockStyle.Fill;
         control.Dock = DockStyle.Fill;
         control.Margin = new Padding(4, 6, 4, 6);
+        if (control is TextBox input) input.BorderStyle = BorderStyle.FixedSingle;
+        if (control is Label hint) { hint.ForeColor = Ui.Muted; hint.Font = new Font("Segoe UI", 9F); }
         Fields.Controls.Add(text, 0, row);
         Fields.Controls.Add(control, 1, row);
     }

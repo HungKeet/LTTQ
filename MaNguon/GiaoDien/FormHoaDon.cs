@@ -1,5 +1,4 @@
 using System.Data;
-using System.Drawing.Printing;
 using System.Net;
 using System.Text;
 using Hotel.Business;
@@ -15,10 +14,10 @@ internal sealed class CheckoutForm : Form
     private readonly Label summary = new()
     {
         Dock = DockStyle.Bottom,
-        Height = 135,
-        Padding = new Padding(16),
-        Font = new Font("Segoe UI", 11F),
-        BackColor = Color.FromArgb(248, 250, 252)
+        Height = 140,
+        Padding = new Padding(20, 16, 20, 16),
+        Font = new Font("Segoe UI", 10.5F),
+        BackColor = Color.FromArgb(236, 244, 241)
     };
 
     public CheckoutForm(HotelService service, Session user, AppSettings settings, int bookingId)
@@ -28,7 +27,7 @@ internal sealed class CheckoutForm : Form
 
         var bar = Ui.Toolbar();
         var method = Ui.Choices("Tiền mặt", "Chuyển khoản", "Thẻ");
-        var notes = new TextBox { Width = 480, MaxLength = 1000, PlaceholderText = "Ghi chú trả phòng (tình trạng phòng, vật phẩm, lưu ý...)" };
+        var notes = new TextBox { Width = 350, MaxLength = 1000, PlaceholderText = "Tình trạng phòng hoặc lưu ý khi trả phòng" };
         Button? payButton = null;
 
         bool Calculate()
@@ -77,19 +76,16 @@ internal sealed class CheckoutForm : Form
             }
         }
 
-        bar.Controls.Add(Ui.Label("Phụ thu (đ):"));
-        bar.Controls.Add(surcharge);
-        bar.Controls.Add(Ui.Label("Giảm trừ (đ):"));
-        bar.Controls.Add(discount);
-        bar.Controls.Add(Ui.Label("Thanh toán:"));
-        bar.Controls.Add(method);
+        surcharge.Width = discount.Width = 140;
+        bar.Controls.Add(OperationalLayout.Field("Phụ thu (đ)", surcharge));
+        bar.Controls.Add(OperationalLayout.Field("Giảm trừ (đ)", discount));
+        bar.Controls.Add(OperationalLayout.Field("Thanh toán", method));
         bar.Controls.Add(Ui.Button("Tính lại", () => Calculate()));
 
         var footer = Ui.Toolbar();
         footer.Dock = DockStyle.Bottom;
-        footer.Controls.Add(Ui.Label("Ghi chú:"));
-        footer.Controls.Add(notes);
-        payButton = Ui.Button("Xác nhận thanh toán & Trả phòng", () =>
+        footer.Controls.Add(OperationalLayout.Field("Ghi chú", notes));
+        payButton = Ui.Button("Thanh toán và trả phòng", () =>
         {
             if (!Calculate())
                 return;
@@ -105,12 +101,17 @@ internal sealed class CheckoutForm : Form
             Close();
         }, true);
         footer.Controls.Add(payButton);
+        var close = Ui.Button("Đóng", Close);
+        footer.Controls.Add(close);
+        CancelButton = close;
 
         surcharge.ValueChanged += (_, _) => Calculate();
         discount.ValueChanged += (_, _) => Calculate();
         method.SelectedIndexChanged += (_, _) => Calculate();
 
-        Controls.Add(grid);
+        var body = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12), BackColor = Ui.Background };
+        body.Controls.Add(grid);
+        Controls.Add(body);
         Controls.Add(bar);
         Controls.Add(summary);
         Controls.Add(footer);
@@ -120,14 +121,8 @@ internal sealed class CheckoutForm : Form
 
 internal sealed class InvoiceForm : Form
 {
-    private readonly InvoiceDocument invoice;
-    private readonly AppSettings settings;
-
     public InvoiceForm(InvoiceDocument invoice, AppSettings settings)
     {
-        this.invoice = invoice;
-        this.settings = settings;
-
         Ui.Setup(this, $"Hóa đơn thanh toán dịch vụ • {invoice.Number} • {settings.HotelName}", 1060, 800);
         MinimumSize = new Size(920, 680);
         BackColor = Color.FromArgb(241, 245, 249); // Nền xám nhạt làm nổi bật trang giấy trắng
@@ -330,30 +325,15 @@ internal sealed class InvoiceForm : Form
         // 6. Thanh công cụ phía dưới (Bottom Action Toolbar)
         var bar = Ui.Toolbar();
         bar.Dock = DockStyle.Bottom;
-        bar.BackColor = Color.FromArgb(248, 250, 252);
-        bar.Padding = new Padding(12);
+        bar.BackColor = Color.White;
+        bar.Padding = new Padding(16, 10, 16, 10);
 
-        bar.Controls.Add(Ui.Button("Xem bản in (Preview)", () =>
-        {
-            using var document = CreatePrintDocument();
-            using var preview = new PrintPreviewDialog { Document = document, Width = 1100, Height = 800 };
-            preview.ShowDialog(this);
-        }, true));
-
-        bar.Controls.Add(Ui.Button("In / Lưu PDF", () =>
-        {
-            using var document = CreatePrintDocument();
-            using var dialog = new PrintDialog { Document = document, UseEXDialog = true };
-            if (dialog.ShowDialog(this) == DialogResult.OK)
-                document.Print();
-        }));
-
-        bar.Controls.Add(Ui.Button("Xuất Excel hóa đơn", () =>
+        bar.Controls.Add(Ui.Button("Xuất Excel", () =>
         {
             XuatExcel.PromptExportInvoice(this, invoice, settings);
         }));
 
-        bar.Controls.Add(Ui.Button("Xuất HTML / Web", () =>
+        bar.Controls.Add(Ui.Button("Xuất HTML", () =>
         {
             using var dialog = new SaveFileDialog
             {
@@ -363,202 +343,16 @@ internal sealed class InvoiceForm : Form
             if (dialog.ShowDialog(this) == DialogResult.OK)
             {
                 File.WriteAllText(dialog.FileName, InvoiceExport.Html(invoice, settings), new UTF8Encoding(true));
-                Ui.Info("Đã xuất hóa đơn HTML thành công. Bạn có thể mở bằng trình duyệt web để xem hoặc in ấn.");
+                Ui.Info("Đã xuất hóa đơn HTML thành công. Bạn có thể mở tệp bằng trình duyệt web để xem.");
             }
         }));
 
-        bar.Controls.Add(Ui.Button("Đóng", Close));
+        var close = Ui.Button("Đóng", Close);
+        bar.Controls.Add(close);
+        CancelButton = close;
 
         Controls.Add(pnlScroll);
         Controls.Add(bar);
-    }
-
-    internal PrintDocument CreatePrintDocument()
-    {
-        var document = new PrintDocument { DocumentName = "HoaDon_" + invoice.Number };
-        document.DefaultPageSettings.Margins = new Margins(50, 50, 50, 50);
-
-        var nights = Money.Nights(invoice.CheckIn, invoice.CheckOut);
-        var inWords = Money.ToWords(invoice.Total);
-        var subtotal = invoice.Lines.Sum(l => l.Amount);
-
-        document.PrintPage += (_, e) =>
-        {
-            var g = e.Graphics!;
-            var bounds = e.MarginBounds;
-            float y = bounds.Top;
-
-            using var fontNormal = new Font("Segoe UI", 9.5F);
-            using var fontBold = new Font("Segoe UI", 9.5F, FontStyle.Bold);
-            using var fontItalic = new Font("Segoe UI", 9F, FontStyle.Italic);
-            using var fontTitle = new Font("Segoe UI", 15F, FontStyle.Bold);
-            using var fontSub = new Font("Segoe UI", 10.5F, FontStyle.Bold);
-            using var brushDark = new SolidBrush(Color.FromArgb(15, 23, 42));
-            using var brushGray = new SolidBrush(Color.FromArgb(100, 116, 139));
-            using var penLine = new Pen(Color.FromArgb(15, 23, 42), 1.5f);
-            using var penThin = new Pen(Color.FromArgb(203, 213, 225), 1f);
-
-            // 1. Hotel Header
-            g.DrawString(settings.HotelName.ToUpper(), fontTitle, brushDark, bounds.Left, y);
-            y += 26;
-            g.DrawString($"⭐⭐⭐⭐⭐ KHÁCH SẠN NGHỈ DƯỠNG & DỊCH VỤ CAO CẤP", fontBold, brushGray, bounds.Left, y);
-            y += 18;
-            g.DrawString($"Địa chỉ: {settings.HotelAddress}   •   Hotline: {settings.HotelPhone}   •   MST: 0108899889", fontNormal, brushDark, bounds.Left, y);
-            y += 24;
-
-            g.DrawLine(penLine, bounds.Left, y, bounds.Right, y);
-            y += 14;
-
-            // 2. Invoice Title Banner
-            var titleText = "HÓA ĐƠN THANH TOÁN DỊCH VỤ (HOTEL GUEST FOLIO)";
-            var titleSize = g.MeasureString(titleText, fontSub);
-            g.DrawString(titleText, fontSub, brushDark, bounds.Left + (bounds.Width - titleSize.Width) / 2, y);
-            y += 22;
-
-            var metaText = $"Số: {invoice.Number}   •   Mã đặt phòng: #{invoice.Id}   •   Ngày lập: {invoice.IssuedAt:dd/MM/yyyy HH:mm}   •   Thu ngân: {invoice.Employee}";
-            var metaSize = g.MeasureString(metaText, fontNormal);
-            g.DrawString(metaText, fontNormal, brushGray, bounds.Left + (bounds.Width - metaSize.Width) / 2, y);
-            y += 26;
-
-            // 3. Guest & Stay Box
-            var boxHeight = 72f;
-            g.DrawRectangle(penThin, bounds.Left, y, bounds.Width, boxHeight);
-            using (var brushBox = new SolidBrush(Color.FromArgb(248, 250, 252)))
-                g.FillRectangle(brushBox, bounds.Left + 1, y + 1, bounds.Width - 2, boxHeight - 2);
-
-            float colLeft = bounds.Left + 14;
-            float colRight = bounds.Left + bounds.Width / 2 + 10;
-            float boxY = y + 8;
-
-            g.DrawString($"Khách hàng: {invoice.Customer}", fontBold, brushDark, colLeft, boxY);
-            g.DrawString($"Nhận phòng: {invoice.CheckIn:dd/MM/yyyy HH:mm}", fontNormal, brushDark, colRight, boxY);
-            boxY += 19;
-
-            g.DrawString($"Điện thoại: {invoice.Phone}   •   CCCD: {invoice.IdentityNumber}", fontNormal, brushDark, colLeft, boxY);
-            g.DrawString($"Trả phòng:  {invoice.CheckOut:dd/MM/yyyy HH:mm}  ({nights} đêm)", fontNormal, brushDark, colRight, boxY);
-            boxY += 19;
-
-            g.DrawString($"Địa chỉ: {invoice.Address}", fontNormal, brushDark, colLeft, boxY);
-            g.DrawString($"Hình thức: {invoice.PaymentMethod}  [ĐÃ THANH TOÁN]", fontBold, brushDark, colRight, boxY);
-            y += boxHeight + 16;
-
-            // 4. Table Header
-            float[] colW = { 45, 90, bounds.Width - 45 - 90 - 55 - 65 - 110 - 120, 55, 65, 110, 120 };
-            using (var brushHeader = new SolidBrush(Color.FromArgb(15, 23, 42)))
-                g.FillRectangle(brushHeader, bounds.Left, y, bounds.Width, 24);
-
-            string[] headers = { "STT", "Khoản mục", "Nội dung dịch vụ", "SL", "ĐVT", "Đơn giá (đ)", "Thành tiền (đ)" };
-            float curX = bounds.Left;
-            using (var brushWhite = new SolidBrush(Color.White))
-            {
-                for (int i = 0; i < headers.Length; i++)
-                {
-                    var hSize = g.MeasureString(headers[i], fontBold);
-                    float hX = (i >= 5) ? curX + colW[i] - hSize.Width - 6 : (i == 0 || i == 3 || i == 4) ? curX + (colW[i] - hSize.Width) / 2 : curX + 6;
-                    g.DrawString(headers[i], fontBold, brushWhite, hX, y + 4);
-                    curX += colW[i];
-                }
-            }
-            y += 24;
-
-            // 5. Table Rows
-            int lineIdx = 1;
-            foreach (var line in invoice.Lines)
-            {
-                g.DrawLine(penThin, bounds.Left, y + 24, bounds.Right, y + 24);
-                curX = bounds.Left;
-
-                string[] cells = {
-                    (lineIdx++).ToString(),
-                    line.Kind,
-                    line.Description,
-                    line.Quantity.ToString("N0"),
-                    line.Unit,
-                    line.UnitPrice.ToString("N0"),
-                    line.Amount.ToString("N0")
-                };
-
-                for (int i = 0; i < cells.Length; i++)
-                {
-                    var cSize = g.MeasureString(cells[i], fontNormal);
-                    float cX = (i >= 5) ? curX + colW[i] - cSize.Width - 6 : (i == 0 || i == 3 || i == 4) ? curX + (colW[i] - cSize.Width) / 2 : curX + 6;
-                    g.DrawString(cells[i], fontNormal, brushDark, cX, y + 4);
-                    curX += colW[i];
-                }
-                y += 24;
-            }
-
-            y += 10;
-            g.DrawLine(penLine, bounds.Left, y, bounds.Right, y);
-            y += 10;
-
-            // 6. Summary Block
-            float leftW = bounds.Width * 0.52f;
-            float rightX = bounds.Left + leftW + 15;
-            float sumY = y;
-
-            // Left: Words & Notes
-            g.DrawString("Số tiền viết bằng chữ:", fontBold, brushDark, bounds.Left, sumY);
-            sumY += 18;
-            g.DrawString(inWords, fontItalic, brushDark, new RectangleF(bounds.Left, sumY, leftW - 10, 40));
-            sumY += 42;
-
-            if (!string.IsNullOrWhiteSpace(invoice.Notes))
-            {
-                g.DrawString($"Ghi chú: {invoice.Notes}", fontNormal, brushGray, new RectangleF(bounds.Left, sumY, leftW - 10, 35));
-            }
-
-            // Right: Numbers
-            float rY = y;
-            void DrawSummaryRow(string label, string val, bool isTotal = false)
-            {
-                var f = isTotal ? fontBold : fontNormal;
-                g.DrawString(label, f, brushDark, rightX, rY);
-                var vSize = g.MeasureString(val, f);
-                g.DrawString(val, f, brushDark, bounds.Right - vSize.Width, rY);
-                rY += 19;
-            }
-
-            DrawSummaryRow("Cộng tiền dịch vụ:", Ui.Currency(subtotal));
-            if (invoice.Surcharge > 0)
-                DrawSummaryRow("Phụ thu (Check-in/out):", "+" + Ui.Currency(invoice.Surcharge));
-            if (invoice.Discount > 0)
-                DrawSummaryRow("Giảm trừ / Khuyến mãi:", "-" + Ui.Currency(invoice.Discount));
-
-            g.DrawLine(penThin, rightX, rY + 2, bounds.Right, rY + 2);
-            rY += 6;
-
-            DrawSummaryRow("TỔNG THANH TOÁN:", Ui.Currency(invoice.Total), true);
-            DrawSummaryRow("Tiền cọc đối trừ:", "-" + Ui.Currency(invoice.Deposit));
-
-            var balLabel = invoice.Balance >= 0 ? "ĐÃ THU THÊM TẠI QUẦY:" : "ĐÃ HOÀN LẠI KHÁCH:";
-            DrawSummaryRow(balLabel, Ui.Currency(Math.Abs(invoice.Balance)), true);
-
-            y = Math.Max(sumY, rY) + 25;
-
-            // 7. Signatures
-            float sigColW = bounds.Width / 2;
-            g.DrawString("KHÁCH HÀNG", fontBold, brushDark, bounds.Left + (sigColW - g.MeasureString("KHÁCH HÀNG", fontBold).Width) / 2, y);
-            g.DrawString("THU NGÂN / LỄ TÂN", fontBold, brushDark, bounds.Left + sigColW + (sigColW - g.MeasureString("THU NGÂN / LỄ TÂN", fontBold).Width) / 2, y);
-            y += 16;
-
-            g.DrawString("(Ký, ghi rõ họ tên)", fontItalic, brushGray, bounds.Left + (sigColW - g.MeasureString("(Ký, ghi rõ họ tên)", fontItalic).Width) / 2, y);
-            g.DrawString("(Ký, ghi rõ họ tên)", fontItalic, brushGray, bounds.Left + sigColW + (sigColW - g.MeasureString("(Ký, ghi rõ họ tên)", fontItalic).Width) / 2, y);
-            y += 55;
-
-            g.DrawString(invoice.Customer, fontBold, brushDark, bounds.Left + (sigColW - g.MeasureString(invoice.Customer, fontBold).Width) / 2, y);
-            g.DrawString(invoice.Employee, fontBold, brushDark, bounds.Left + sigColW + (sigColW - g.MeasureString(invoice.Employee, fontBold).Width) / 2, y);
-            y += 28;
-
-            // 8. Footer Note
-            var footText = $"Cảm ơn Quý khách đã lựa chọn {settings.HotelName}! Kính chúc Quý khách một chuyến đi an toàn & hẹn gặp lại!";
-            var footSize = g.MeasureString(footText, fontItalic);
-            g.DrawString(footText, fontItalic, brushGray, bounds.Left + (bounds.Width - footSize.Width) / 2, y);
-
-            e.HasMorePages = false;
-        };
-
-        return document;
     }
 }
 
@@ -933,12 +727,13 @@ internal sealed class InvoicesPage : Panel
         this.user = user;
         Dock = DockStyle.Fill;
 
+        var filters = Ui.Toolbar();
+        filters.Controls.Add(OperationalLayout.Field("Từ ngày", from));
+        filters.Controls.Add(OperationalLayout.Field("Đến ngày", to));
+        search.Width = 260;
+        search.AccessibleName = "Tìm hóa đơn theo mã, tên hoặc điện thoại";
+        filters.Controls.Add(search);
         var bar = Ui.Toolbar();
-        bar.Controls.Add(Ui.Label("Từ ngày:"));
-        bar.Controls.Add(from);
-        bar.Controls.Add(Ui.Label("Đến ngày:"));
-        bar.Controls.Add(to);
-        bar.Controls.Add(search);
         bar.Controls.Add(Ui.Button("Tìm / tải lại", RefreshData));
         bar.Controls.Add(Ui.Button("Xuất Excel danh sách", () =>
         {
@@ -953,9 +748,11 @@ internal sealed class InvoicesPage : Panel
             form.ShowDialog(this);
         }
 
-        bar.Controls.Add(Ui.Button("Xem / in hóa đơn", Open, true));
+        bar.Controls.Add(Ui.Button("Xem hóa đơn", Open, true));
         grid.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) Ui.Run(Open); };
-        Controls.Add(Ui.Page(grid, bar));
+        var page = Ui.Page(grid, bar);
+        page.Controls.Add(filters);
+        Controls.Add(page);
     }
 
     public void RefreshData()

@@ -10,6 +10,9 @@ internal static class Program
     [STAThread]
     static void Main(string[] args)
     {
+        var uiSmoke = args.Contains("--ui-smoke");
+        if (uiSmoke)
+            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
         CultureInfo.DefaultThreadCurrentCulture = CultureInfo.GetCultureInfo("vi-VN");
         CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.GetCultureInfo("vi-VN");
         ApplicationConfiguration.Initialize();
@@ -17,6 +20,11 @@ internal static class Program
         try
         {
             var settings = AppSettings.Load();
+            if (uiSmoke)
+            {
+                UiSmoke.Run(settings, args);
+                return;
+            }
             var service = new HotelService(new Database(settings.ConnectionString));
             if (args.Contains("--initialize"))
             {
