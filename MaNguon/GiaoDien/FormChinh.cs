@@ -278,8 +278,6 @@ internal sealed class DashboardPage : Panel
                 {
                     using var p = new Pen(borderColor, 1.5f);
                     e.Graphics.DrawRectangle(p, 0, 0, card.Width - 1, card.Height - 1);
-                    using var bar = new SolidBrush(titleColor);
-                    e.Graphics.FillRectangle(bar, 0, 0, card.Width, 5);
                 };
                 var title = new Label { Text = $"Phòng {r["Số phòng"]} • {status}", Dock = DockStyle.Top, Height = 44, AutoEllipsis = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = titleColor };
                 var detail = new Label { Dock = DockStyle.Fill, Text = $"{r["Loại phòng"]} • Tầng {r["Tầng"]} • {r["Sức chứa"]} khách\n{Ui.Currency(r.Field<decimal>("Giá / đêm"))} / đêm\n" + (r.IsNull("Khách đang ở") ? "Phòng trống" : $"Khách: {r["Khách đang ở"]}\nTrả dự kiến: {r.Field<DateTime>("Dự kiến trả"):dd/MM HH:mm}\n" + (overdue ? "QUÁ HẠN TRẢ PHÒNG" : "")), Padding = new Padding(0, 5, 0, 0) };
