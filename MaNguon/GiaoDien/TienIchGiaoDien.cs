@@ -185,6 +185,7 @@ internal static class Ui
     }
     public static int Value(ComboBox combo) => combo.SelectedValue is int id ? id : throw new ArgumentException("Vui lòng chọn đầy đủ thông tin trong danh sách.");
     public static NumericUpDown Number(decimal max = 1000000000, decimal value = 0, decimal min = 0) => new() { Maximum = max, Minimum = min, Value = Math.Clamp(value, min, max), ThousandsSeparator = true, Width = 170 };
+    public static MoneyBox Money(decimal max = 1000000000, decimal value = 0, decimal min = 0) => new(max, value, min);
     public static string Currency(decimal value) => value.ToString("N0") + " đ";
     public static Panel Page(DataGridView grid, FlowLayoutPanel bar)
     {
@@ -192,6 +193,217 @@ internal static class Ui
         p.Controls.Add(grid);
         p.Controls.Add(bar);
         return p;
+    }
+}
+
+internal sealed class MoneyBox : Panel
+{
+    private readonly TextBox textBox;
+    private readonly Label unitLabel;
+    private decimal minimum;
+    private decimal maximum;
+    private decimal currentValue;
+    private bool updatingText;
+
+    public event EventHandler? ValueChanged;
+
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public decimal Minimum
+    {
+        get => minimum;
+        set
+        {
+            minimum = value;
+            if (currentValue < minimum)
+                Value = minimum;
+        }
+    }
+
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public decimal Maximum
+    {
+        get => maximum;
+        set
+        {
+            maximum = value;
+            if (currentValue > maximum)
+                Value = maximum;
+        }
+    }
+
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public decimal Value
+    {
+        get => currentValue;
+        set
+        {
+            var clamped = Math.Clamp(value, minimum, maximum);
+            if (currentValue != clamped || textBox.Text != clamped.ToString("N0"))
+            {
+                currentValue = clamped;
+                updatingText = true;
+                textBox.Text = currentValue.ToString("N0");
+                updatingText = false;
+                ValueChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+    }
+
+    public MoneyBox(decimal max = 1000000000, decimal value = 0, decimal min = 0)
+    {
+        maximum = max;
+        minimum = min;
+        currentValue = Math.Clamp(value, min, max);
+
+        Width = 170;
+        Height = 25;
+        BackColor = Color.White;
+        BorderStyle = BorderStyle.FixedSingle;
+        Padding = new Padding(4, 3, 0, 2);
+
+        unitLabel = new Label
+        {
+            Text = "đ",
+            Dock = DockStyle.Right,
+            Width = 26,
+            TextAlign = ContentAlignment.MiddleCenter,
+            BackColor = Color.FromArgb(241, 245, 249),
+            ForeColor = Color.FromArgb(71, 85, 105),
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+            Cursor = Cursors.IBeam
+        };
+        unitLabel.Paint += (s, e) =>
+        {
+            using var pen = new Pen(Color.FromArgb(203, 213, 225));
+            e.Graphics.DrawLine(pen, 0, 0, 0, unitLabel.Height);
+        };
+
+        textBox = new TextBox
+        {
+            BorderStyle = BorderStyle.None,
+            Dock = DockStyle.Fill,
+            Font = new Font("Segoe UI", 9.5F),
+            BackColor = Color.White,
+            TextAlign = HorizontalAlignment.Left,
+            Text = currentValue.ToString("N0")
+        };
+
+        unitLabel.Click += (_, _) => textBox.Focus();
+        Click += (_, _) => textBox.Focus();
+
+        textBox.Enter += (_, _) => textBox.SelectAll();
+
+        textBox.KeyPress += (s, e) =>
+        {
+            if (char.IsControl(e.KeyChar))
+                return;
+
+            if (e.KeyChar is < '0' or > '9')
+            {
+                e.Handled = true;
+            }
+        };
+
+        textBox.KeyDown += (s, e) =>
+        {
+            var separator = System.Globalization.CultureInfo.CurrentCulture.NumberFormat.NumberGroupSeparator;
+            if (separator.Length == 0 || textBox.SelectionLength != 0) return;
+            var caret = textBox.SelectionStart;
+            if (e.KeyCode == Keys.Back && caret >= separator.Length &&
+                textBox.Text.AsSpan(caret - separator.Length, separator.Length).SequenceEqual(separator.AsSpan()))
+            {
+                textBox.SelectionStart -= separator.Length;
+            }
+            else if (e.KeyCode == Keys.Delete && caret + separator.Length <= textBox.Text.Length &&
+                textBox.Text.AsSpan(caret, separator.Length).SequenceEqual(separator.AsSpan()))
+            {
+                textBox.SelectionStart += separator.Length;
+            }
+        };
+
+        textBox.TextChanged += (s, e) =>
+        {
+            if (updatingText) return;
+            updatingText = true;
+            try
+            {
+                var raw = textBox.Text;
+                static bool IsDigit(char c) => c is >= '0' and <= '9';
+                var digitsBeforeCaret = raw.Take(textBox.SelectionStart).Count(IsDigit);
+                var digits = new string(raw.Where(IsDigit).ToArray());
+
+                if (string.IsNullOrEmpty(digits))
+                {
+                    if (currentValue != minimum)
+                    {
+                        currentValue = minimum;
+                        ValueChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                    if (raw.Length > 0) textBox.Clear();
+                    return;
+                }
+
+                // Overflowing pasted input is clamped immediately, so the displayed value
+                // always agrees with Value instead of silently retaining the previous amount.
+                if (!decimal.TryParse(digits, System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture, out var parsed))
+                    parsed = maximum;
+                {
+                    if (parsed > maximum) parsed = maximum;
+                    if (parsed < minimum) parsed = minimum;
+
+                    bool valChanged = (parsed != currentValue);
+                    currentValue = parsed;
+
+                    string formatted = parsed.ToString("N0");
+                    if (textBox.Text != formatted)
+                    {
+                        textBox.Text = formatted;
+                        int newSel = 0, seen = 0;
+                        while (newSel < formatted.Length && seen < digitsBeforeCaret)
+                        {
+                            if (IsDigit(formatted[newSel])) seen++;
+                            newSel++;
+                        }
+                        textBox.SelectionStart = newSel;
+                    }
+
+                    if (valChanged)
+                    {
+                        ValueChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+            }
+            finally
+            {
+                updatingText = false;
+            }
+        };
+
+        textBox.Leave += (_, _) =>
+        {
+            if (string.IsNullOrWhiteSpace(textBox.Text))
+            {
+                Value = minimum;
+            }
+            else
+            {
+                textBox.Text = currentValue.ToString("N0");
+            }
+        };
+
+        Controls.Add(textBox);
+        Controls.Add(unitLabel);
+        unitLabel.SendToBack();
+        textBox.BringToFront();
+    }
+
+    protected override void OnEnabledChanged(EventArgs e)
+    {
+        base.OnEnabledChanged(e);
+        textBox.Enabled = Enabled;
+        BackColor = Enabled ? Color.White : SystemColors.Control;
+        textBox.BackColor = BackColor;
     }
 }
 

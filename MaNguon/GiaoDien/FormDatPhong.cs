@@ -73,7 +73,8 @@ internal sealed class BookingEditor : Form
     private readonly DataGridView rooms = Ui.Grid(); private readonly ComboBox customer;
     private readonly ComboBox rentalType = Ui.Choices("Theo ngày", "Theo giờ");
     private readonly DateTimePicker arrival = Ui.Date(DateTime.Today.AddHours(14)), departure = Ui.Date(DateTime.Today.AddDays(1).AddHours(12));
-    private readonly NumericUpDown guests = Ui.Number(200, 1, 1), deposit = Ui.Number();
+    private readonly NumericUpDown guests = Ui.Number(200, 1, 1);
+    private readonly MoneyBox deposit = Ui.Money();
     private readonly TextBox notes = new() { MaxLength = 1000, Width = 380, PlaceholderText = "Yêu cầu hoặc lưu ý của khách" };
     private readonly Label totals = Ui.Label(""); private DateTime searchedArrival, searchedDeparture;
     private readonly Dictionary<int, (decimal Rate, int Capacity)> snapshots = new();
@@ -183,7 +184,7 @@ internal sealed class BookingEditor : Form
         line2.Controls.Add(OperationalLayout.Field("Số khách *", guests));
         line2.Controls.Add(Ui.Button("Tải lại phòng", FindRooms));
         var line3 = Ui.Toolbar();
-        line3.Controls.Add(OperationalLayout.Field("Cọc đã nhận (đ)", deposit));
+        line3.Controls.Add(OperationalLayout.Field("Cọc đã nhận", deposit));
         line3.Controls.Add(OperationalLayout.Field("Ghi chú", notes));
         form.Controls.Add(line1, 0, 0);
         form.Controls.Add(customerLine1, 0, 1);
