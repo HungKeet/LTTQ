@@ -51,15 +51,15 @@ dotnet test KiemThu/KiemThuKhachSan -c Release
 | Dịch vụ | Thêm, sửa số lượng, xóa dòng trước thanh toán; lưu tên, đơn vị và giá lịch sử |
 | Thanh toán | Tiền đêm thực tế, phí nâng phòng từng chặng, dịch vụ, phụ thu, giảm giá, đối trừ tiền cọc, thu thêm hoặc hoàn khách, phương thức thanh toán |
 | Hóa đơn | Tra cứu, xem chi tiết, xuất Excel/HTML; khóa sửa/xóa sau thanh toán |
-| Vận hành | Bấm thống kê để lọc trạng thái kết hợp tầng/loại phòng, bấm thẻ phòng để nhận khách ngay hoặc quản lý lưu trú; đặt trước tại Đặt phòng & lưu trú trong menu bên trái; phòng chờ dọn sau trả/đổi phòng, xác nhận đã dọn, bảo trì, lịch sử khách hàng |
+| Vận hành | Bấm thống kê để lọc trạng thái kết hợp tầng/loại phòng, bấm thẻ phòng để nhận khách ngay hoặc quản lý lưu trú; đặt trước tại Đặt phòng, lưu trú & thanh toán trong menu bên trái; phòng chờ dọn sau trả/đổi phòng, xác nhận đã dọn, bảo trì, lịch sử khách hàng |
 | Báo cáo | Doanh thu theo ngày trong khoảng lọc, doanh thu dịch vụ, xuất CSV, nhật ký 500 thao tác gần nhất |
 
 ## Quy tắc đã chọn
 
 - Giờ dự kiến mặc định đến 14:00, đi 12:00; có thể sửa giờ và chọn đến/đi cùng ngày khi giờ đi sau giờ đến. Nhận sớm trong cùng ngày được phép nếu phòng sẵn sàng và không xung đột.
 - Đổi phòng trong lượt ở giữ giá đã chốt, tiền cọc và dịch vụ; kiểm tra sức chứa/lịch phòng mới, đánh dấu phòng cũ chờ dọn và ghi nhật ký. Phiếu quá giờ trả cần gia hạn trước khi đổi phòng.
-- Nâng cấp phòng dành cho khách đang ở: chọn phòng trống có giá cao hơn giá đang áp dụng. Phí dự kiến = chênh lệch giá × số đêm còn lại; khi trả phòng, hóa đơn ghi dòng Nâng phòng theo thời gian thực tế từ lúc nâng cấp, tối thiểu một đêm. Không đổi giá các đêm trước đó, không thu tiền ở bước xác nhận nâng cấp. Nếu nâng nhiều lần, mỗi lần chỉ cộng phần tăng thêm; đổi phòng thường sau đó vẫn giữ giá đã thỏa thuận.
-- Tính theo **chênh lệch ngày lịch thực tế, tối thiểu 1 đêm**; không phải đơn giá theo từng 24 giờ. Phụ thu sớm/muộn nhập thủ công sau khi thống nhất với khách.
+- Nâng cấp phòng dành cho khách đang ở: chọn phòng trống giá cao hơn. Phí dự kiến và phí thực tế tính theo hình thức thuê, dựa trên phần chênh lệch giá và thời gian từ lúc nâng cấp. Không đổi giá khoảng trước đó; nếu nâng nhiều lần, mỗi lần chỉ cộng phần tăng thêm.
+- Thuê ngày tính theo chênh lệch ngày lịch thực tế, tối thiểu 1 đêm. Thuê giờ làm tròn lên giờ: 1–2 giờ bằng 35% giá ngày, từ giờ thứ 3 thêm 10% mỗi giờ, từ 6 đến 24 giờ bằng một giá ngày. Khi ở quá 24 giờ, mỗi 24 giờ đủ tính một giá ngày, phần còn lại tính theo biểu giá giờ. Giờ đặt dự kiến tối đa 24 giờ.
 - Một phiếu nhận/trả cùng lúc tất cả phòng đã đặt. Dịch vụ gắn với phiếu chung. Chưa có tách hóa đơn hoặc trả riêng từng phòng.
 - Hủy trước nhận phòng hoàn toàn bộ tiền cọc, cần người dùng xác nhận đã hoàn. Chương trình ghi nhận thanh toán, không thực hiện chuyển tiền ngân hàng.
 - Tổng tiền = tiền phòng + dịch vụ + phụ thu − giảm giá. Thu thêm = tổng tiền − cọc; số âm là tiền hoàn.

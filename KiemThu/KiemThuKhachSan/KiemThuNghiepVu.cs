@@ -86,12 +86,12 @@ public sealed class BusinessTests(DatabaseFixture fixture) : IClassFixture<Datab
         var text = "O'Brian; DROP TABLE Rooms; --";
         var id = f.Service.SaveCatalog(f.Reception, CatalogKind.Customers, null, new()
         {
-            ["FullName"] = text,
+            ["FullName"] = "O'Brian",
             ["Phone"] = "0901234567",
             ["IdentityNumber"] = Guid.NewGuid().ToString("N")[..20],
-            ["Address"] = "Hà Nội"
+            ["Address"] = text
         });
-        Assert.Equal(text, f.Service.CatalogRecord(f.Admin, CatalogKind.Customers, id)["FullName"]);
+        Assert.Equal(text, f.Service.CatalogRecord(f.Admin, CatalogKind.Customers, id)["Address"]);
         Assert.True(f.Service.Catalog(f.Reception, CatalogKind.Customers, "O'Brian").Rows.Count > 0);
         Assert.True(f.Db.Query("SELECT * FROM Rooms").Rows.Count > 0);
     }
@@ -101,7 +101,8 @@ public sealed class BusinessTests(DatabaseFixture fixture) : IClassFixture<Datab
         var tag = Guid.NewGuid().ToString("N")[..20];
         var input = new Dictionary<string, object?> { ["FullName"] = "Khách kiểm thử", ["Phone"] = "0901234567", ["IdentityNumber"] = tag };
         var id = f.Service.SaveCatalog(f.Admin, CatalogKind.Customers, null, input);
-        Assert.Throws<SqlException>(() => f.Service.SaveCatalog(f.Admin, CatalogKind.Customers, null, input));
+        var error = Assert.Throws<InvalidOperationException>(() => f.Service.SaveCatalog(f.Admin, CatalogKind.Customers, null, input));
+        Assert.Contains("chọn khách hàng", error.Message);
         f.Service.DeleteCatalog(f.Admin, CatalogKind.Customers, id);
         Assert.Throws<InvalidOperationException>(() => f.Service.CatalogRecord(f.Admin, CatalogKind.Customers, id));
     }

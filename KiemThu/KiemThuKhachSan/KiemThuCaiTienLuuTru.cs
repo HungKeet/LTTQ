@@ -12,7 +12,7 @@ public sealed class StayImprovementsTests(DatabaseFixture fixture) : IClassFixtu
 
     private Dictionary<string, object?> Customer(string? identity = null) => new()
     {
-        ["FullName"] = "Khách tại quầy " + Guid.NewGuid().ToString("N")[..8],
+        ["FullName"] = "Khách tại quầy",
         ["Phone"] = "0901234567",
         ["IdentityNumber"] = identity ?? Guid.NewGuid().ToString("N")[..20],
         ["Address"] = "Hà Nội"
@@ -264,7 +264,8 @@ public sealed class StayImprovementsTests(DatabaseFixture fixture) : IClassFixtu
         var customer = Customer();
         f.Service.SaveCatalog(f.Reception, CatalogKind.Customers, null, customer);
         var count = f.Db.Query("SELECT Id FROM Bookings").Rows.Count;
-        Assert.Throws<SqlException>(() => f.Service.WalkIn(f.Reception, f.Input([f.Room()]), customer));
+        var duplicate = Assert.Throws<InvalidOperationException>(() => f.Service.WalkIn(f.Reception, f.Input([f.Room()]), customer));
+        Assert.Contains("chọn khách hàng", duplicate.Message);
         customer["Phone"] = "abc";
         Assert.Throws<ArgumentException>(() => f.Service.WalkIn(f.Reception, f.Input([f.Room()]), customer));
         Assert.Equal(count, f.Db.Query("SELECT Id FROM Bookings").Rows.Count);

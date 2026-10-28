@@ -22,7 +22,6 @@ internal sealed class LoginForm : EditorForm
             try
             {
                 service.Initialize();
-                service.EnsureDemoData();
                 Session = service.Login(username.Text, password.Text);
                 if (string.IsNullOrWhiteSpace(Session.Role))
                     throw new UnauthorizedAccessException("Tài khoản chưa được phân quyền truy cập hệ thống.");

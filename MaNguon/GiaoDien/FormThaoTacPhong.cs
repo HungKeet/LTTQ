@@ -87,10 +87,10 @@ internal sealed class RoomActionsForm : Form
         details.Text = $"{row["Loại phòng"]} • Tầng {row["Tầng"]} • Sức chứa {row["Sức chứa"]} khách\n" +
             $"Giá danh mục: {Ui.Currency(row.Field<decimal>("Giá / đêm"))} / đêm\n\n" +
             (displayedBooking.HasValue
-                ? $"Khách đang ở: {row["Khách đang ở"]}\nPhiếu lưu trú: #{displayedBooking}\nDự kiến trả: {row.Field<DateTime>("Dự kiến trả"):dd/MM/yyyy HH:mm}"
+                ? $"Khách đang ở: {row["Khách đang ở"]}\nHình thức: {row["Hình thức"]}\nPhiếu lưu trú: #{displayedBooking}\nDự kiến trả: {row.Field<DateTime>("Dự kiến trả"):dd/MM/yyyy HH:mm}"
                 : displayedStatus switch
                 {
-                    "Sẵn sàng" => "Nhận phòng nhanh dành cho khách đến tại quầy; phòng này sẽ được chọn sẵn để nhận ngay.\nĐể đặt phòng trước theo ngày ở, chọn Đặt phòng & lưu trú trong menu bên trái.",
+                    "Sẵn sàng" => "Nhận phòng theo ngày hoặc theo giờ cho khách tại quầy; phòng này sẽ được chọn sẵn.\nĐể đặt phòng trước, chọn Đặt phòng, lưu trú & thanh toán trong menu bên trái.",
                     "Chờ dọn" => "Phòng cần được dọn xong trước khi nhận khách mới. Xác nhận sau khi nhân viên đã hoàn tất dọn phòng.",
                     _ => "Phòng đang bảo trì và chưa thể nhận khách. Quản lý có thể cập nhật tình trạng phòng sau khi hoàn tất bảo trì."
                 });
@@ -105,7 +105,7 @@ internal sealed class RoomActionsForm : Form
             }
             if (displayedStatus == "Sẵn sàng")
             {
-                AddAction("WalkIn", "Nhận phòng nhanh", OpenWalkIn, true);
+                AddAction("WalkIn", "Nhận khách tại quầy", () => OpenWalkIn(), true);
             }
             else if (displayedStatus == "Đang ở")
             {
@@ -144,10 +144,10 @@ internal sealed class RoomActionsForm : Form
         finally { actions.ResumeLayout(); }
     }
 
-    private void OpenWalkIn()
+    private void OpenWalkIn(string rentalType = "Theo ngày")
     {
         RequireCurrent("Sẵn sàng");
-        using var editor = new BookingEditor(service, user, null, true, roomId);
+        using var editor = new BookingEditor(service, user, null, true, roomId, rentalType);
         if (editor.ShowDialog(this) == DialogResult.OK)
         {
             DialogResult = DialogResult.OK;

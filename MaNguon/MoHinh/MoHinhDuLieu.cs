@@ -1,11 +1,11 @@
-namespace Hotel.Core;
+﻿namespace Hotel.Core;
 
 public sealed record Session(int UserId, int EmployeeId, string Username, string FullName, string Role);
-public sealed record BookingInput(int CustomerId, DateTime Arrival, DateTime Departure, int Guests, decimal Deposit, string Notes, IReadOnlyList<int> RoomIds);
-public sealed record RoomUpgradeQuote(int BookingId, int StayId, int OldRoomId, int NewRoomId, string OldRoomNumber, string NewRoomNumber, decimal OldRate, decimal NewRate, DateTime Departure, DateTime QuotedAt, int Nights)
+public sealed record BookingInput(int CustomerId, DateTime Arrival, DateTime Departure, int Guests, decimal Deposit, string Notes, IReadOnlyList<int> RoomIds, string RentalType = "Theo ngày");
+public sealed record RoomUpgradeQuote(int BookingId, int StayId, int OldRoomId, int NewRoomId, string OldRoomNumber, string NewRoomNumber, decimal OldRate, decimal NewRate, DateTime Departure, DateTime QuotedAt, int Nights, string RentalType = "Theo ngày", int Hours = 0)
 {
     public decimal Difference => NewRate - OldRate;
-    public decimal Fee => Money.Round(Difference * Nights);
+    public decimal Fee => RentalType == "Theo giờ" ? Money.HourlyCharge(Difference, Hours) : Money.Round(Difference * Nights);
 }
 public sealed record InvoiceLine(string Kind, string Description, decimal Quantity, string Unit, decimal UnitPrice)
 {
@@ -24,6 +24,24 @@ public sealed record InvoiceDocument(int Id, string Number, string Customer, str
 public static class Money
 {
     public static decimal Round(decimal value) => decimal.Round(value, 0, MidpointRounding.AwayFromZero);
+    public static int Hours(DateTime arrival, DateTime departure)
+    {
+        if (departure < arrival)
+            throw new ArgumentException("Thời điểm trả phòng phải sau thời điểm nhận phòng.");
+        var totalMinutes = (departure - arrival).TotalMinutes;
+        return Math.Max(1, (int)Math.Ceiling(totalMinutes / 60.0));
+    }
+    public static decimal HourlyCharge(decimal dailyRate, int hours)
+    {
+        if (hours <= 0 || dailyRate <= 0) return 0;
+        int days = hours / 24;
+        int remaining = hours % 24;
+        if (remaining == 0) return days * dailyRate;
+        decimal first2Hours = Math.Max(1m, Round(dailyRate * 0.35m));
+        decimal nextHours = Round(dailyRate * 0.10m);
+        decimal remainderCharge = remaining >= 6 ? dailyRate : Math.Min(dailyRate, first2Hours + Math.Max(0, remaining - 2) * nextHours);
+        return days * dailyRate + remainderCharge;
+    }
     public static int Nights(DateTime arrival, DateTime departure)
     {
         if (departure < arrival)

@@ -23,6 +23,7 @@ internal sealed class CatalogEditor : EditorForm
     }
 
     private readonly Dictionary<string, Control> controls = new();
+    private readonly CustomerFieldValidator customerValidation = new();
 
     public CatalogEditor(HotelService service, Session user, CatalogKind kind, int? id = null) : base((id.HasValue ? "Sửa " : "Thêm ") + CatalogPage.Title(kind), 540)
 
@@ -40,7 +41,26 @@ internal sealed class CatalogEditor : EditorForm
 
             controls[key] = t;
 
-            AddField(label, t, multiline ? 75 : 44);
+            if (kind == CatalogKind.Customers)
+            {
+                Func<string, string> check = key switch
+                {
+                    "FullName" => CustomerValidation.FullName,
+                    "Phone" => CustomerValidation.Phone,
+                    "IdentityNumber" => CustomerValidation.Identity,
+                    "Address" => CustomerValidation.Address,
+                    _ => throw new ArgumentOutOfRangeException(nameof(key))
+                };
+                var wrapper = new Panel();
+                t.Dock = DockStyle.Top;
+                if (multiline) t.Height = 45;
+                var error = new Label { Dock = DockStyle.Top, Height = 34, ForeColor = Color.Firebrick, Font = new Font("Segoe UI", 8F), Visible = false };
+                wrapper.Controls.Add(error);
+                wrapper.Controls.Add(t);
+                customerValidation.Attach(t, error, check);
+                AddField(label, wrapper, multiline ? 100 : 76);
+            }
+            else AddField(label, t, multiline ? 75 : 44);
 
         }
 
@@ -195,6 +215,7 @@ internal sealed class CatalogEditor : EditorForm
 
         {
 
+            if (kind == CatalogKind.Customers && !customerValidation.ValidateAll()) return;
             var values = controls.ToDictionary(k => k.Key, k => k.Value switch { TextBox t => (object?)t.Text, NumericUpDown n => n.Value, CheckBox check => check.Checked, ComboBox combo => combo.DataSource is null ? combo.SelectedItem : combo.SelectedValue, _ => null });
 
             SavedId = service.SaveCatalog(user, kind, id, values);

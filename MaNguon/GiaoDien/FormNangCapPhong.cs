@@ -39,14 +39,14 @@ internal sealed class UpgradeRoomForm : EditorForm
         AddField("Phòng đang ở", currentRoom, 64);
         AddField("Nâng cấp đến", newRoom, 56);
         AddField("Giá phòng mới", newRate, 42);
-        AddField("Cách tính phí", calculation, 82);
+        AddField("Cách tính phí", calculation, 64);
         AddField("Phí nâng cấp dự kiến", fee, 56);
         AddField("Thanh toán", new Label
         {
-            Text = "Phí = chênh lệch giá × số đêm còn lại, tối thiểu 1 đêm kể cả nâng cấp trong ngày.\nPhí được cộng tự động vào hóa đơn khi trả phòng, tính theo thời gian thực tế; chưa thu tiền ở bước này.",
+            Text = "Giữ giá cũ trước nâng cấp. Phí thực tế được cộng khi trả phòng.",
             AutoSize = false,
             UseMnemonic = false
-        }, 82);
+        }, 62);
         AddField("Trạng thái", status, 72);
         fee.Font = new Font("Segoe UI", 14F, FontStyle.Bold);
         fee.ForeColor = Ui.Slate;
@@ -66,7 +66,7 @@ internal sealed class UpgradeRoomForm : EditorForm
         quote = null;
         confirm.Enabled = false;
         newRate.Text = "—";
-        calculation.Text = "Chọn phòng mới để xem chênh lệch và số đêm còn lại.";
+        calculation.Text = "Chọn phòng để xem phí dự kiến.";
         fee.Text = "—";
     }
 
@@ -84,7 +84,12 @@ internal sealed class UpgradeRoomForm : EditorForm
             var departure = booking.Field<DateTime>("Departure");
             var now = DateTime.Now;
             if (departure <= now)
+            {
+                if (booking.Field<string>("RentalType") == "Theo giờ" &&
+                    booking.Field<DateTime>("ActualCheckIn").AddHours(24) <= now)
+                    throw new InvalidOperationException("Lượt thuê giờ đã vượt 24 giờ. Hãy thanh toán lượt hiện tại trước khi nhận phòng mới.");
                 throw new InvalidOperationException("Phiếu đã quá giờ trả dự kiến. Hãy đổi ngày đi trước khi nâng cấp phòng.");
+            }
             var booked = service.BookingRooms(user, bookingId);
             var source = booked.AsEnumerable().SingleOrDefault(row => row.Field<int>("Id") == roomId)
                 ?? throw new InvalidOperationException("Khách đã chuyển khỏi phòng này. Hãy đóng và tải lại sơ đồ phòng.");
@@ -110,8 +115,8 @@ internal sealed class UpgradeRoomForm : EditorForm
                 newRoom.SelectedValue = selected.Value;
             status.ForeColor = Ui.Muted;
             status.Text = choices.Rows.Count > 0
-                ? $"Có {choices.Rows.Count} phòng giá cao hơn, đủ sức chứa và trống đến giờ đi."
-                : "Không có phòng phù hợp để nâng cấp trong thời gian còn lại. Có thể tải lại sau khi có phòng sẵn sàng.";
+                ? $"Có {choices.Rows.Count} phòng phù hợp."
+                : "Không có phòng phù hợp. Hãy tải lại sau.";
             if (choices.Rows.Count == 0)
                 return;
         }
@@ -136,11 +141,12 @@ internal sealed class UpgradeRoomForm : EditorForm
             quote = service.PreviewRoomUpgrade(user, bookingId, roomId, target);
             currentRoom.Text = $"Phòng {quote.OldRoomNumber}\nGiá đang áp dụng: {Ui.Currency(quote.OldRate)} / đêm";
             newRate.Text = Ui.Currency(quote.NewRate) + " / đêm";
-            calculation.Text = $"{Ui.Currency(quote.Difference)} / đêm × {quote.Nights} đêm còn lại\n" +
-                $"Theo ngày đi dự kiến: {quote.Departure:dd/MM/yyyy HH:mm}\nCác đêm trước khi nâng cấp vẫn giữ giá cũ.";
+            calculation.Text = quote.RentalType == "Theo giờ"
+                ? $"Chênh {Ui.Currency(quote.Difference)} / đêm, tính theo {quote.Hours} giờ còn lại.\nDự kiến trả: {quote.Departure:dd/MM/yyyy HH:mm}"
+                : $"{Ui.Currency(quote.Difference)} / đêm × {quote.Nights} đêm còn lại\nDự kiến trả: {quote.Departure:dd/MM/yyyy HH:mm}";
             fee.Text = Ui.Currency(quote.Fee);
             status.ForeColor = Ui.Muted;
-            status.Text = "Đã kiểm tra lịch phòng và phí dự kiến. Phòng cũ sẽ chuyển sang Chờ dọn sau khi nâng cấp.";
+            status.Text = "Phòng cũ sẽ chuyển sang Chờ dọn sau khi nâng cấp.";
             confirm.Enabled = true;
         }
         catch (Exception exception)

@@ -7,6 +7,14 @@ namespace Hotel.Business;
 
 public sealed partial class HotelService
 {
+    public int InvoiceIdForBooking(Session user, int bookingId)
+    {
+        using var connection = db.Open();
+        Authorize(connection, null, user);
+        return Database.Scalar<int>(connection, null,
+            "SELECT Id FROM Invoices WHERE BookingId=@id", ("@id", bookingId));
+    }
+
     public RoomUpgradeQuote PreviewRoomUpgrade(Session user, int bookingId, int oldRoomId, int newRoomId)
     {
         return db.Transaction((c, t) =>
@@ -54,7 +62,8 @@ public sealed partial class HotelService
             throw new ArgumentException("Phòng nâng cấp phải có đơn giá cao hơn giá đang áp dụng. Chuyển phòng giữ giá dùng chức năng Đổi phòng.");
         return new RoomUpgradeQuote(bookingId, oldRoom.Field<int>("StayId"), oldRoomId, newRoomId,
             oldRoom.Field<string>("Number")!, target.Field<string>("Number")!, oldRate, newRate,
-            departure, now, Money.Nights(now, departure));
+            departure, now, Money.Nights(now, departure), booking.Field<string>("RentalType")!,
+            booking.Field<string>("RentalType") == "Theo giờ" ? Money.Hours(now, departure) : 0);
     }
 
     public void UpgradeRoom(Session user, RoomUpgradeQuote preview)
@@ -66,7 +75,7 @@ public sealed partial class HotelService
             var quote = QuoteRoomUpgrade(c, t, preview.BookingId, preview.OldRoomId, preview.NewRoomId, DateTime.Now);
             if (quote.StayId != preview.StayId || quote.OldRoomNumber != preview.OldRoomNumber || quote.NewRoomNumber != preview.NewRoomNumber
                 || quote.OldRate != preview.OldRate || quote.NewRate != preview.NewRate || quote.Departure != preview.Departure
-                || quote.Nights != preview.Nights || quote.Fee != preview.Fee)
+                || quote.Nights != preview.Nights || quote.RentalType != preview.RentalType || quote.Hours != preview.Hours || quote.Fee != preview.Fee)
                 throw new InvalidOperationException("Thông tin hoặc phí nâng cấp đã thay đổi. Hãy tải lại và kiểm tra khoản chênh lệch trước khi xác nhận.");
 
             var capacity = Database.Scalar<int>(c, t,
@@ -87,7 +96,7 @@ public sealed partial class HotelService
             Database.Execute(c, t, "UPDATE Rooms SET OperationalStatus=N'Chờ dọn' WHERE Id=@old", ("@old", quote.OldRoomId));
             Audit(c, t, user, "Nâng cấp phòng",
                 $"Phiếu #{quote.BookingId}: phòng {quote.OldRoomNumber} → {quote.NewRoomNumber}; {quote.OldRate:N0} → {quote.NewRate:N0} đ/đêm; " +
-                $"chênh {quote.Difference:N0} × {quote.Nights} đêm dự kiến = {quote.Fee:N0} đ; cộng hóa đơn khi trả phòng");
+                $"chênh {quote.Difference:N0}; {(quote.RentalType == "Theo giờ" ? $"{quote.Hours} giờ" : $"{quote.Nights} đêm")} dự kiến = {quote.Fee:N0} đ; cộng hóa đơn khi trả phòng");
             return true;
         });
     }

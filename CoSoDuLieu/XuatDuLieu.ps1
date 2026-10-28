@@ -40,7 +40,7 @@ $tables = @(
     @{ Name = 'Employees'; Identity = $true; Columns = @('Id','FullName','Phone','Position','Active') },
     @{ Name = 'Users'; Identity = $true; Columns = @('Id','EmployeeId','Username','PasswordHash','Role','Active') },
     @{ Name = 'Services'; Identity = $true; Columns = @('Id','Name','Unit','Price','Active') },
-    @{ Name = 'Bookings'; Identity = $true; Columns = @('Id','CustomerId','EmployeeId','Arrival','Departure','Guests','Deposit','RefundedDeposit','Status','ActualCheckIn','ActualCheckOut','Notes','CreatedAt') },
+    @{ Name = 'Bookings'; Identity = $true; Columns = @('Id','CustomerId','EmployeeId','Arrival','Departure','Guests','Deposit','RefundedDeposit','Status','ActualCheckIn','ActualCheckOut','Notes','CreatedAt','RentalType') },
     @{ Name = 'BookingRooms'; Identity = $true; Columns = @('StayId','BookingId','RoomId','NightlyRate','Capacity') },
     @{ Name = 'RoomUpgrades'; Identity = $true; Columns = @('Id','StayId','FromRoomId','ToRoomId','FromRoomNumber','ToRoomNumber','OldNightlyRate','NewNightlyRate','UpgradedAt','EmployeeId') },
     @{ Name = 'ServiceUsages'; Identity = $true; Columns = @('Id','BookingId','ServiceId','ServiceName','Unit','Quantity','UnitPrice','UsedAt') },
@@ -60,7 +60,7 @@ function Format-SqlValue($value) {
 }
 
 $sb = [System.Text.StringBuilder]::new()
-[void]$sb.AppendLine('-- Snapshot schema v2: includes stable room stays and paid upgrade history.')
+[void]$sb.AppendLine('-- Snapshot: includes stable room stays, paid upgrade history and booking rental type.')
 [void]$sb.AppendLine('-- Initialize an empty target with CaiDat.sql; change USE only when restoring to another database.')
 [void]$sb.AppendLine('-- Existing paid upgrade history is protected: use a fresh target or a full database backup restore.')
 [void]$sb.AppendLine('-- Exported: ' + (Get-Date).ToString('yyyy-MM-dd HH:mm:ss'))
@@ -76,8 +76,8 @@ BEGIN TRY
     DECLARE @LockResult int;
     EXEC @LockResult=sys.sp_getapplock @Resource=N'HotelBTL.Write', @LockMode='Exclusive', @LockOwner='Transaction', @LockTimeout=10000;
     IF @LockResult<0 THROW 51010, N'Hotel is busy; retry the import later.', 1;
-    IF COL_LENGTH(N'dbo.BookingRooms',N'StayId') IS NULL OR OBJECT_ID(N'dbo.RoomUpgrades') IS NULL
-        THROW 51011, N'Initialize the target with the current CaiDat.sql before importing schema v2 data.', 1;
+    IF COL_LENGTH(N'dbo.BookingRooms',N'StayId') IS NULL OR OBJECT_ID(N'dbo.RoomUpgrades') IS NULL OR COL_LENGTH(N'dbo.Bookings',N'RentalType') IS NULL
+        THROW 51011, N'Initialize the target with the current CaiDat.sql before importing this data.', 1;
     DECLARE @HasUpgrades bit = 0;
     IF OBJECT_ID(N'dbo.RoomUpgrades') IS NOT NULL
         EXEC sys.sp_executesql N'IF EXISTS(SELECT 1 FROM dbo.RoomUpgrades WITH(HOLDLOCK)) SET @found=1;', N'@found bit OUTPUT', @found=@HasUpgrades OUTPUT;
@@ -109,7 +109,7 @@ try {
     try {
         $lockCommand.Transaction = $transaction
         $lockCommand.CommandTimeout = 30
-        $lockCommand.CommandText = "DECLARE @r int; EXEC @r=sys.sp_getapplock @Resource=N'HotelBTL.Write', @LockMode='Shared', @LockOwner='Transaction', @LockTimeout=10000; IF @r<0 THROW 51010, N'Hotel is busy; retry the export later.', 1; IF COL_LENGTH(N'dbo.BookingRooms',N'StayId') IS NULL OR OBJECT_ID(N'dbo.RoomUpgrades') IS NULL THROW 51011, N'Run the current application schema initialization before exporting.', 1;"
+        $lockCommand.CommandText = "DECLARE @r int; EXEC @r=sys.sp_getapplock @Resource=N'HotelBTL.Write', @LockMode='Shared', @LockOwner='Transaction', @LockTimeout=10000; IF @r<0 THROW 51010, N'Hotel is busy; retry the export later.', 1; IF COL_LENGTH(N'dbo.BookingRooms',N'StayId') IS NULL OR OBJECT_ID(N'dbo.RoomUpgrades') IS NULL OR COL_LENGTH(N'dbo.Bookings',N'RentalType') IS NULL THROW 51011, N'Run the current application schema initialization before exporting.', 1;"
         [void]$lockCommand.ExecuteNonQuery()
     } finally { $lockCommand.Dispose() }
 

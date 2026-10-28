@@ -55,14 +55,14 @@ internal sealed class MainForm : Form
         body.Controls.Add(menu);
         var status = new Label { Dock = DockStyle.Bottom, Height = 28, Padding = new Padding(18, 0, 12, 0), Text = $"Ngọc Khoa  /  {user.Role}                                      {DateTime.Today:dd/MM/yyyy}", Font = new Font("Segoe UI", 8.5F), ForeColor = Ui.Muted, BackColor = Color.White, TextAlign = ContentAlignment.MiddleLeft };
         void Section(string name) => menu.Controls.Add(new Label { Text = name, AutoSize = false, Width = 164, Height = 20, Margin = new Padding(10, 6, 0, 0), ForeColor = Ui.Muted, Font = new Font("Segoe UI", 8F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft });
-        void Page(string title, string hint, Control panel, Action refresh)
+        void Page(string title, string hint, Control panel, Action refresh, string? menuTitle = null)
         {
             var tab = new TabPage(title) { BackColor = Ui.Background, Padding = Padding.Empty };
             tab.Controls.Add(panel);
             Tabs.TabPages.Add(tab);
             refreshers[tab] = refresh;
             hints[tab] = hint;
-            var button = new Button { Text = title, UseMnemonic = false, Width = 174, Height = 37, FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = Ui.DarkText, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(12, 0, 4, 0), Margin = new Padding(0, 1, 0, 1), Cursor = Cursors.Hand, Font = new Font("Segoe UI", 9.5F), AccessibleName = title };
+            var button = new Button { Text = menuTitle ?? title, UseMnemonic = false, Width = 174, Height = menuTitle?.Contains('\n') == true ? 50 : 37, FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = Ui.DarkText, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(12, 0, 4, 0), Margin = new Padding(0, 1, 0, 1), Cursor = Cursors.Hand, Font = new Font("Segoe UI", 9.5F), AccessibleName = title };
             button.FlatAppearance.BorderSize = 0;
             button.FlatAppearance.MouseOverBackColor = Ui.SoftAccent;
             button.FlatAppearance.MouseDownBackColor = Color.FromArgb(211, 229, 224);
@@ -75,7 +75,7 @@ internal sealed class MainForm : Form
         var dashboard = new DashboardPage(service, user, settings);
         Page("Sơ đồ phòng", "Theo dõi tình trạng phòng và thao tác tại quầy.", dashboard, dashboard.RefreshData);
         var bookings = new BookingsPage(service, user, settings);
-        Page("Đặt phòng & lưu trú", "Tra cứu phiếu đặt, nhận phòng và xử lý lưu trú.", bookings, bookings.RefreshData);
+        Page("Đặt phòng, lưu trú & thanh toán", "Tra cứu phiếu đặt, nhận phòng, xử lý lưu trú và thanh toán.", bookings, bookings.RefreshData, "Đặt phòng, lưu trú\n& thanh toán");
         Section("DANH MỤC");
         var roomsPage = new CatalogPage(service, user, CatalogKind.Rooms);
         Page("Phòng", "Quản lý danh sách phòng và tình trạng vận hành.", roomsPage, roomsPage.RefreshData);
@@ -280,7 +280,7 @@ internal sealed class DashboardPage : Panel
                     e.Graphics.DrawRectangle(p, 0, 0, card.Width - 1, card.Height - 1);
                 };
                 var title = new Label { Text = $"Phòng {r["Số phòng"]} • {status}", Dock = DockStyle.Top, Height = 44, AutoEllipsis = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = titleColor };
-                var detail = new Label { Dock = DockStyle.Fill, Text = $"{r["Loại phòng"]} • Tầng {r["Tầng"]} • {r["Sức chứa"]} khách\n{Ui.Currency(r.Field<decimal>("Giá / đêm"))} / đêm\n" + (r.IsNull("Khách đang ở") ? "Phòng trống" : $"Khách: {r["Khách đang ở"]}\nTrả dự kiến: {r.Field<DateTime>("Dự kiến trả"):dd/MM HH:mm}\n" + (overdue ? "QUÁ HẠN TRẢ PHÒNG" : "")), Padding = new Padding(0, 5, 0, 0) };
+                var detail = new Label { Dock = DockStyle.Fill, Text = $"{r["Loại phòng"]} • Tầng {r["Tầng"]} • {r["Sức chứa"]} khách\n{Ui.Currency(r.Field<decimal>("Giá / đêm"))} / đêm\n" + (r.IsNull("Khách đang ở") ? (status switch { "Sẵn sàng" => "Sẵn sàng nhận khách", "Chờ dọn" => "Cần dọn phòng", "Bảo trì" => "Chưa thể nhận khách", _ => "Chưa có khách" }) : $"Khách: {r["Khách đang ở"]}\nHình thức: {r["Hình thức"]}\nTrả dự kiến: {r.Field<DateTime>("Dự kiến trả"):dd/MM HH:mm}\n" + (overdue ? "QUÁ HẠN TRẢ PHÒNG" : "")), Padding = new Padding(0, 5, 0, 0) };
                 card.Controls.Add(detail);
                 card.Controls.Add(title);
                 void OpenRoom()
@@ -455,7 +455,8 @@ internal sealed class BarChartControl : Panel
 
         float slotW = (float)plotW / count;
 
-        float barW = Math.Clamp(slotW * 0.58f, 16f, 48f);
+        float barW = Math.Min(slotW * 0.75f, 48f);
+        int labelStep = Math.Max(1, (int)Math.Ceiling(70f / slotW));
 
 
 
@@ -483,7 +484,7 @@ internal sealed class BarChartControl : Panel
 
 
 
-            if (barW >= 20)
+            if (slotW >= 70)
 
             {
 
@@ -499,7 +500,7 @@ internal sealed class BarChartControl : Panel
 
             var sfX = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Near };
 
-            g.DrawString(item.Label, font, grayBrush, new RectangleF(cx - slotW / 2, padTop + plotH + 6, slotW, 36), sfX);
+            if (i % labelStep == 0) g.DrawString(item.Label, font, grayBrush, new RectangleF(cx - 35, padTop + plotH + 6, 70, 36), sfX);
 
         }
 
@@ -517,7 +518,9 @@ internal sealed class ReportsPage : Panel
 
     private readonly BarChartControl chart = new();
 
-    private readonly Label summary = new() { Dock = DockStyle.Bottom, Height = 78, Padding = new Padding(12), BackColor = Ui.SoftAccent, Font = new Font("Segoe UI", 10, FontStyle.Bold) };
+
+    private readonly Label reportStatus = new() { Dock = DockStyle.Top, Height = 64, Padding = new Padding(12, 7, 12, 5), BackColor = Ui.SoftAccent, ForeColor = Ui.DarkText };
+    private Button exportExcel = null!, exportCsv = null!;
 
     private readonly DateTimePicker from = Ui.Date(new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1)), to = Ui.Date(DateTime.Today);
 
@@ -547,9 +550,15 @@ internal sealed class ReportsPage : Panel
 
         bar.Controls.Add(Ui.Button("Xem thống kê", RefreshData, true));
 
-        exports.Controls.Add(Ui.Button("Xuất Excel", () => { if (grid.DataSource is not DataTable data || data.Rows.Count == 0) throw new InvalidOperationException("Chưa có dữ liệu để xuất."); XuatExcel.PromptExport(this, data, "ThongKeDoanhThu_" + DateTime.Now.ToString("yyyyMMdd") + ".xlsx", "DoanhThu"); }));
+        exportExcel = Ui.Button("Xuất Excel", () => { if (grid.DataSource is not DataTable data || data.Rows.Count == 0) throw new InvalidOperationException("Chưa có dữ liệu để xuất."); XuatExcel.PromptExport(this, data, "ThongKeDoanhThu_" + DateTime.Now.ToString("yyyyMMdd") + ".xlsx", "DoanhThu"); });
+        exports.Controls.Add(exportExcel);
 
-        exports.Controls.Add(Ui.Button("Xuất CSV", () => { if (grid.DataSource is not DataTable data || data.Rows.Count == 0) throw new InvalidOperationException("Chưa có dữ liệu để xuất."); using var dialog = new SaveFileDialog { Filter = "CSV UTF-8|*.csv", FileName = "ThongKe_" + DateTime.Now.ToString("yyyyMMdd") + ".csv" }; if (dialog.ShowDialog(this) == DialogResult.OK) { File.WriteAllText(dialog.FileName, Csv(data), new UTF8Encoding(true)); Ui.Info("Đã xuất thống kê."); } }));
+        exportCsv = Ui.Button("Xuất CSV", () => { if (grid.DataSource is not DataTable data || data.Rows.Count == 0) throw new InvalidOperationException("Chưa có dữ liệu để xuất."); using var dialog = new SaveFileDialog { Filter = "CSV UTF-8|*.csv", FileName = "ThongKe_" + DateTime.Now.ToString("yyyyMMdd") + ".csv" }; if (dialog.ShowDialog(this) == DialogResult.OK) { File.WriteAllText(dialog.FileName, Csv(data), new UTF8Encoding(true)); Ui.Info("Đã xuất thống kê."); } });
+        exports.Controls.Add(exportCsv);
+        from.ValueChanged += (_, _) => MarkPending();
+        to.ValueChanged += (_, _) => MarkPending();
+        mode.SelectedIndexChanged += (_, _) => MarkPending();
+        MarkPending();
 
 
 
@@ -573,18 +582,25 @@ internal sealed class ReportsPage : Panel
 
 
 
+        var resultArea = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
+        split.Dock = DockStyle.Top;
+        split.Height = 420;
+        resultArea.Controls.Add(split);
         Padding = new Padding(12);
-        Controls.Add(split);
+        Controls.Add(resultArea);
         Controls.Add(exports);
+        Controls.Add(reportStatus);
         Controls.Add(bar);
 
-        Controls.Add(summary);
+
 
     }
 
     public void RefreshData()
-
     {
+        MarkPending();
+        try
+        {
 
         if (to.Value.Date < from.Value.Date)
 
@@ -610,7 +626,7 @@ internal sealed class ReportsPage : Panel
 
         Ui.Bind(grid, data);
         var total = data.AsEnumerable().Sum(r => r.Field<decimal>(column));
-        summary.Text = $"{column}: {Ui.Currency(total)}\n" + (mode.SelectedIndex < 2 ? "Theo ngày/tháng lập hóa đơn đã thanh toán; tiền cọc đã đối trừ, không cộng thêm vào doanh thu." : "Tổng tiền dòng dịch vụ trước giảm giá/phụ thu chung của hóa đơn.");
+
 
         var chartItems = new List<(string Label, decimal Value)>();
         foreach (DataRow row in data.Rows)
@@ -632,7 +648,26 @@ internal sealed class ReportsPage : Panel
             _ => "Biểu đồ cột: Doanh thu theo từng dịch vụ (đ)"
         };
         chart.SetData(chartItems, chartTitle);
+        reportStatus.ForeColor = Ui.DarkText;
+        reportStatus.Text = data.Rows.Count == 0
+            ? $"Không có dữ liệu • {mode.Text} • {from.Value:dd/MM/yyyy} – {to.Value:dd/MM/yyyy}."
+            : $"Đã cập nhật • {mode.Text} • {from.Value:dd/MM/yyyy} – {to.Value:dd/MM/yyyy}\n{data.Rows.Count} dòng • {column}: {Ui.Currency(total)}\n" +
+              (mode.SelectedIndex < 2 ? "Theo ngày lập hóa đơn; tiền cọc không cộng thêm vào doanh thu." : "Tổng dịch vụ trước phụ thu và giảm giá chung.");
+        exportExcel.Enabled = exportCsv.Enabled = data.Rows.Count > 0;
+        }
+        catch
+        {
+            reportStatus.Text = "Không thể cập nhật. Kết quả cũ có thể không khớp bộ lọc; hãy kiểm tra và thử lại.";
+            throw;
+        }
 
+    }
+
+    private void MarkPending()
+    {
+        exportExcel.Enabled = exportCsv.Enabled = false;
+        reportStatus.ForeColor = Color.Firebrick;
+        reportStatus.Text = "Bộ lọc chưa áp dụng. Bấm Xem thống kê để cập nhật kết quả và xuất dữ liệu.";
     }
 
     internal static string Csv(DataTable data)

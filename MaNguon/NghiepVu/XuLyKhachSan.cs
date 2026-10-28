@@ -723,17 +723,11 @@ public sealed partial class HotelService(Database database)
                 break;
 
             case CatalogKind.Customers:
-
-                values["FullName"] = Text("FullName", 100);
-
-                values["Phone"] = Phone();
-
-                var identity = Text("IdentityNumber", 30, false);
-
+                values["FullName"] = CustomerValidation.FullName(Convert.ToString(fields.GetValueOrDefault("FullName")));
+                values["Phone"] = CustomerValidation.Phone(Convert.ToString(fields.GetValueOrDefault("Phone")));
+                var identity = CustomerValidation.Identity(Convert.ToString(fields.GetValueOrDefault("IdentityNumber")));
                 values["IdentityNumber"] = identity.Length == 0 ? null : identity;
-
-                values["Address"] = Text("Address", 250, false);
-
+                values["Address"] = CustomerValidation.Address(Convert.ToString(fields.GetValueOrDefault("Address")));
                 break;
 
             case CatalogKind.Services:
@@ -799,12 +793,18 @@ public sealed partial class HotelService(Database database)
         {
 
             Authorize(c, t, user, kind != CatalogKind.Customers);
+            if (kind == CatalogKind.Customers && values["IdentityNumber"] is string customerIdentity)
+                EnsureCustomerIdentityAvailable(c, t, customerIdentity, id);
 
+
+            var employeeRoleChanged = !id.HasValue;
             if (id.HasValue)
 
             {
 
                 var old = Single(Database.Query(c, t, $"SELECT * FROM {kind} WHERE Id=@id", ("@id", id)));
+                if (kind == CatalogKind.Employees)
+                    employeeRoleChanged = !Equals(old["Position"], values["Position"]);
                 if (kind == CatalogKind.Users && !values.ContainsKey("EmployeeId"))
                     values["EmployeeId"] = old["EmployeeId"];
 
@@ -815,6 +815,9 @@ public sealed partial class HotelService(Database database)
                 if (kind == CatalogKind.Employees && id == user.EmployeeId && !active)
 
                     throw new InvalidOperationException("Không thể ngừng hoạt động nhân viên đang đăng nhập.");
+
+                if (kind == CatalogKind.Employees && id == user.EmployeeId && !Equals(values["Position"], "Quản lý"))
+                    throw new InvalidOperationException("Không thể hạ quyền quản lý của nhân viên đang đăng nhập.");
 
                 if (kind is CatalogKind.Rooms && (!active || !Equals(old["RoomTypeId"], values["RoomTypeId"]) || !Equals(old["Number"], values["Number"]) || !Equals(old["OperationalStatus"], values["OperationalStatus"])))
 
@@ -882,19 +885,18 @@ public sealed partial class HotelService(Database database)
                 var empName = (string)values["FullName"]!;
                 var empRole = (string)values["Position"]!;
                 var empPassVal = Convert.ToString(fields.GetValueOrDefault("Password")) ?? "";
-                var userRows = Database.Query(c, t, "SELECT Id, Username FROM Users WHERE EmployeeId=@eid", ("@eid", savedId));
+                var userRows = Database.Query(c, t, "SELECT Id, Username FROM Users WHERE EmployeeId=@eid ORDER BY Id", ("@eid", savedId));
                 if (userRows.Rows.Count > 0)
                 {
-                    var uid = userRows.Rows[0].Field<int>("Id");
+                    if (empPassVal.Length > 0 && userRows.Rows.Count > 1)
+                        throw new InvalidOperationException("Nhân viên có nhiều tài khoản. Hãy đổi mật khẩu riêng trong mục Tài khoản.");
+                    // Employee activation already gates login; preserve each account's independent lock state.
+                    if (employeeRoleChanged)
+                        Database.Execute(c, t, "UPDATE Users SET Role=@r WHERE EmployeeId=@eid", ("@r", empRole), ("@eid", savedId));
                     if (empPassVal.Length > 0)
                     {
-                        Database.Execute(c, t, "UPDATE Users SET PasswordHash=@p, Role=@r, Active=@a WHERE Id=@id",
-                            ("@p", HashPassword(empPassVal)), ("@r", empRole), ("@a", active), ("@id", uid));
-                    }
-                    else
-                    {
-                        Database.Execute(c, t, "UPDATE Users SET Role=@r, Active=@a WHERE Id=@id",
-                            ("@r", empRole), ("@a", active), ("@id", uid));
+                        Database.Execute(c, t, "UPDATE Users SET PasswordHash=@p WHERE Id=@id",
+                            ("@p", HashPassword(empPassVal)), ("@id", userRows.Rows[0].Field<int>("Id")));
                     }
                 }
                 else if (empPassVal.Length > 0)

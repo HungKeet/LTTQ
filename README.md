@@ -20,8 +20,9 @@ Tài khoản mẫu khi khởi tạo: quản lý `admin / Admin@123`, lễ tân `
 ## Chức năng
 
 - Sơ đồ phòng có bộ lọc trạng thái, tầng và loại phòng; bấm thẻ để thao tác.
-- Đặt trước tại **Đặt phòng & lưu trú**; nhận khách ngay bằng **Nhận phòng nhanh**.
-- **Đổi phòng** giữ giá đã chốt. **Nâng cấp phòng** hiển thị chênh lệch giá × số đêm còn lại, rồi cộng phí riêng vào hóa đơn khi trả phòng; các đêm trước giữ giá cũ.
+- Đặt trước theo ngày hoặc nhận khách ngay tại quầy trong **Đặt phòng, lưu trú & thanh toán**; khi nhận tại quầy có thể chọn thuê theo ngày hoặc theo giờ.
+- **Đổi phòng** giữ giá đã chốt. **Nâng cấp phòng** báo phí dự kiến theo hình thức thuê và cộng phí riêng vào hóa đơn khi trả phòng.
+- Thuê ngày tính theo đêm lịch, tối thiểu một đêm. Thuê giờ làm tròn lên giờ: hai giờ đầu 35% giá ngày, mỗi giờ tiếp theo thêm 10%, từ 6 đến 24 giờ tính một giá ngày. Nếu ở quá 24 giờ, mỗi 24 giờ đủ tính một giá ngày, phần còn lại áp dụng biểu giá giờ.
 - Hóa đơn xuất Excel/HTML; báo cáo doanh thu theo ngày/tháng và dịch vụ.
 - Giữ các cải tiến mới về màu trạng thái phòng và bảng dữ liệu cuộn mượt.
 

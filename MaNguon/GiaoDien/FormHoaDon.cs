@@ -91,7 +91,15 @@ internal sealed class CheckoutForm : Form
                 return;
             var q = quote!;
             var amount = q.Balance >= 0 ? $"thu thêm {Ui.Currency(q.Balance)}" : $"hoàn lại {Ui.Currency(-q.Balance)}";
-            if (!Ui.Confirm($"Xác nhận {amount} qua hình thức {method.Text.ToLower()} và hoàn tất thủ tục trả phòng?\nHóa đơn thanh toán sẽ được khóa và lưu vào hệ thống."))
+            // The room lines come from the same quote that Checkout validates again before saving.
+            var roomLines = q.Lines.Where(line => line.Kind == "Phòng").Select(line => line.Description).ToArray();
+            if (roomLines.Length == 0)
+                throw new InvalidOperationException("Phiếu không có phòng để trả. Hãy tải lại và kiểm tra phiếu lưu trú.");
+            var rooms = string.Join("\n", roomLines.Select(room => "• " + room));
+            if (!Ui.Confirm($"Phiếu #{bookingId} có {roomLines.Length} phòng:\n{rooms}\n\n" +
+                $"Thao tác này sẽ trả TẤT CẢ các phòng trên phiếu.\n" +
+                $"Xác nhận {amount} qua hình thức {method.Text.ToLower()} và hoàn tất trả phòng?\n" +
+                "Hóa đơn thanh toán sẽ được khóa và lưu vào hệ thống."))
                 return;
 
             var invoiceId = service.Checkout(user, q, method.Text, notes.Text);

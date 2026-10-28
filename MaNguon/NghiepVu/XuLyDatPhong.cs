@@ -7,6 +7,18 @@ namespace Hotel.Business;
 
 public sealed partial class HotelService
 {
+    private static void EnsureCustomerIdentityAvailable(SqlConnection c, SqlTransaction t, string identity, int? exceptId)
+    {
+        if (identity.Length == 0) return;
+        var matches = Database.Query(c, t,
+            "SELECT Active FROM Customers WHERE IdentityNumber=@identity AND Id<>@id",
+            ("@identity", identity), ("@id", exceptId ?? 0));
+        if (matches.Rows.Count > 0)
+            throw new InvalidOperationException(matches.Rows[0].Field<bool>("Active")
+                ? "Giấy tờ đã tồn tại. Hãy chọn khách hàng đã có."
+                : "Giấy tờ thuộc khách đã ngừng hoạt động. Hãy mở lại khách hàng trước khi sử dụng.");
+    }
+
     private const string ConflictCondition = """
         (((CASE WHEN b.Status=N'Đang ở' THEN COALESCE(b.ActualCheckIn,b.Arrival) ELSE b.Arrival END)<@to AND b.Departure>@from)
         OR (b.Status=N'Đang ở' AND b.Departure<=@now AND @from<=@now))
@@ -23,7 +35,7 @@ public sealed partial class HotelService
         return Database.Query(c, null, """
             SELECT r.Id, r.Number AS [Số phòng], t.Name AS [Loại phòng],r.Floor AS [Tầng],t.Capacity AS [Sức chứa],t.Rate AS [Giá / đêm],
             CASE WHEN b.Id IS NOT NULL THEN N'Đang ở' ELSE r.OperationalStatus END AS [Trạng thái],
-            c.FullName AS [Khách đang ở], b.Departure AS [Dự kiến trả], b.Id AS [Mã phiếu]
+            c.FullName AS [Khách đang ở], b.Departure AS [Dự kiến trả], b.Id AS [Mã phiếu], b.RentalType AS [Hình thức]
             FROM Rooms r JOIN RoomTypes t ON t.Id=r.RoomTypeId
             OUTER APPLY(SELECT TOP(1) b.* FROM Bookings b JOIN BookingRooms br ON br.BookingId=b.Id WHERE br.RoomId=r.Id AND b.Status=N'Đang ở') b
             LEFT JOIN Customers c ON c.Id=b.CustomerId WHERE r.Active=1 ORDER BY r.Number
@@ -54,6 +66,11 @@ public sealed partial class HotelService
         if ((to - from).TotalDays > 365)
             throw new ArgumentException("Một lượt đặt không vượt quá 365 ngày.");
     }
+    private static void ValidateHourlyDuration(string? rentalType, DateTime from, DateTime to)
+    {
+        if (rentalType == "Theo giờ" && to - from > TimeSpan.FromHours(24))
+            throw new ArgumentException("Thuê theo giờ tối đa 24 tiếng dự kiến. Thời gian dài hơn vui lòng chọn hình thức Theo ngày.");
+    }
     public int SaveBooking(Session user, BookingInput input, int? bookingId = null)
         => db.Transaction((c, t) => SaveBooking(c, t, user, input, bookingId));
 
@@ -63,6 +80,7 @@ public sealed partial class HotelService
         ValidateDates(input.Arrival, input.Departure);
         if (input.Arrival.Date < now.Date)
             throw new ArgumentException("Ngày đến không được trước hôm nay.");
+        ValidateHourlyDuration(input.RentalType, input.Arrival, input.Departure);
         if (input.RoomIds.Count == 0 || input.RoomIds.Distinct().Count() != input.RoomIds.Count)
             throw new ArgumentException("Cần chọn ít nhất một phòng; không chọn phòng trùng.");
         if (input.Guests < 1 || input.Deposit < 0 || input.Deposit > 1000000000 || input.Notes.Length > 1000)
@@ -88,19 +106,19 @@ public sealed partial class HotelService
         }
         if (input.Guests > rooms.Sum(r => r.Capacity))
             throw new ArgumentException("Số khách vượt tổng sức chứa của các phòng đã chọn.");
-        var args = new (string, object?)[] { ("@customer", input.CustomerId), ("@employee", user.EmployeeId), ("@from", input.Arrival), ("@to", input.Departure), ("@guests", input.Guests), ("@deposit", Money.Round(input.Deposit)), ("@notes", input.Notes.Trim()), ("@id", bookingId ?? 0) };
+        var args = new (string, object?)[] { ("@customer", input.CustomerId), ("@employee", user.EmployeeId), ("@from", input.Arrival), ("@to", input.Departure), ("@guests", input.Guests), ("@deposit", Money.Round(input.Deposit)), ("@notes", input.Notes.Trim()), ("@rental", input.RentalType), ("@id", bookingId ?? 0) };
         int id;
         if (bookingId.HasValue)
         {
             id = bookingId.Value;
-            Database.Execute(c, t, "UPDATE Bookings SET CustomerId=@customer,Arrival=@from,Departure=@to,Guests=@guests,Deposit=@deposit,Notes=@notes WHERE Id=@id", args);
+            Database.Execute(c, t, "UPDATE Bookings SET CustomerId=@customer,Arrival=@from,Departure=@to,Guests=@guests,Deposit=@deposit,Notes=@notes,RentalType=@rental WHERE Id=@id", args);
             Database.Execute(c, t, "DELETE BookingRooms WHERE BookingId=@id", ("@id", id));
         }
         else
-            id = Database.Scalar<int>(c, t, "INSERT Bookings(CustomerId,EmployeeId,Arrival,Departure,Guests,Deposit,Notes) OUTPUT INSERTED.Id VALUES(@customer,@employee,@from,@to,@guests,@deposit,@notes)", args);
+            id = Database.Scalar<int>(c, t, "INSERT Bookings(CustomerId,EmployeeId,Arrival,Departure,Guests,Deposit,Notes,RentalType) OUTPUT INSERTED.Id VALUES(@customer,@employee,@from,@to,@guests,@deposit,@notes,@rental)", args);
         foreach (var room in rooms)
             Database.Execute(c, t, "INSERT BookingRooms(BookingId,RoomId,NightlyRate,Capacity) VALUES(@b,@r,@rate,@capacity)", ("@b", id), ("@r", room.Id), ("@rate", room.Rate), ("@capacity", room.Capacity));
-        Audit(c, t, user, bookingId.HasValue ? "Sửa đặt phòng" : "Đặt phòng", $"Phiếu #{id}; cọc {input.Deposit:N0}");
+        Audit(c, t, user, bookingId.HasValue ? "Sửa đặt phòng" : "Đặt phòng", $"Phiếu #{id} ({input.RentalType}); cọc {input.Deposit:N0}");
         return id;
     }
     private static DataRow RequireBooking(SqlConnection c, SqlTransaction? t, int id, params string[] statuses)
@@ -127,19 +145,21 @@ public sealed partial class HotelService
             FROM BookingRooms br JOIN Rooms r ON r.Id=br.RoomId WHERE br.BookingId=@id ORDER BY r.Number
             """, ("@id", id));
     }
-    public DataTable Bookings(Session user, string search = "", string status = "Tất cả", int? customerId = null)
+    public DataTable Bookings(Session user, string search = "", string status = "Tất cả", int? customerId = null, string rentalType = "Tất cả")
     {
         using var c = db.Open();
         Authorize(c, null, user);
         return Database.Query(c, null, """
             SELECT b.Id,c.FullName AS [Khách hàng],c.Phone AS [Điện thoại],
+            b.RentalType AS [Hình thức],
             (SELECT STRING_AGG(r.Number,N', ') FROM BookingRooms br JOIN Rooms r ON r.Id=br.RoomId WHERE br.BookingId=b.Id) AS [Phòng],
             b.Arrival AS [Ngày đến],b.Departure AS [Ngày đi],b.Guests AS [Số khách],b.Deposit AS [Tiền cọc],b.RefundedDeposit AS [Cọc đã hoàn],b.Status AS [Trạng thái],b.ActualCheckIn AS [Nhận thực tế],b.ActualCheckOut AS [Trả thực tế],b.Notes AS [Ghi chú]
             FROM Bookings b JOIN Customers c ON c.Id=b.CustomerId
             WHERE (@status=N'Tất cả' OR b.Status=@status) AND (@customer=0 OR c.Id=@customer)
+              AND (@rental=N'Tất cả' OR b.RentalType=@rental)
             AND (c.FullName LIKE @s OR c.Phone LIKE @s OR CONVERT(nvarchar(20),b.Id)=@exact OR EXISTS(SELECT 1 FROM BookingRooms br JOIN Rooms r ON r.Id=br.RoomId WHERE br.BookingId=b.Id AND r.Number LIKE @s))
             ORDER BY b.Id DESC
-            """, ("@s", "%" + search.Trim() + "%"), ("@exact", search.Trim()), ("@status", status), ("@customer", customerId ?? 0));
+            """, ("@s", "%" + search.Trim() + "%"), ("@exact", search.Trim()), ("@status", status), ("@customer", customerId ?? 0), ("@rental", rentalType));
     }
     public void CancelBooking(Session user, int id)
     {
@@ -166,6 +186,7 @@ public sealed partial class HotelService
         var b = RequireBooking(c, t, id, "Đã đặt");
         if (now.Date < b.Field<DateTime>("Arrival").Date || now >= b.Field<DateTime>("Departure"))
             throw new InvalidOperationException("Chưa đến ngày nhận phòng hoặc đã quá ngày đi. Hãy sửa thời gian đặt trước.");
+        ValidateHourlyDuration(b.Field<string>("RentalType"), now, b.Field<DateTime>("Departure"));
         foreach (DataRow r in Database.Query(c, t, "SELECT r.*,rt.Active AS TypeActive FROM Rooms r JOIN RoomTypes rt ON rt.Id=r.RoomTypeId JOIN BookingRooms br ON br.RoomId=r.Id WHERE br.BookingId=@id", ("@id", id)).Rows)
         {
             if (!r.Field<bool>("Active") || !r.Field<bool>("TypeActive") || r.Field<string>("OperationalStatus") != "Sẵn sàng")
@@ -191,19 +212,11 @@ public sealed partial class HotelService
             var customerId = input.CustomerId;
             if (newCustomer is not null)
             {
-                string Text(string key, int max, bool required = true)
-                {
-                    var value = Convert.ToString(newCustomer.GetValueOrDefault(key))?.Trim() ?? "";
-                    if ((required && value.Length == 0) || value.Length > max)
-                        throw new ArgumentException($"Thông tin {Labels.GetValueOrDefault(key, key)} phải có {(required ? "1" : "0")}–{max} ký tự.");
-                    return value;
-                }
-                var name = Text("FullName", 100);
-                var phone = Text("Phone", 25);
-                if (!System.Text.RegularExpressions.Regex.IsMatch(phone, @"^\+?[0-9]{9,15}$"))
-                    throw new ArgumentException("Điện thoại gồm 9–15 chữ số, có thể bắt đầu bằng +.");
-                var identity = Text("IdentityNumber", 30, false);
-                var address = Text("Address", 250, false);
+                var name = CustomerValidation.FullName(Convert.ToString(newCustomer.GetValueOrDefault("FullName")));
+                var phone = CustomerValidation.Phone(Convert.ToString(newCustomer.GetValueOrDefault("Phone")));
+                var identity = CustomerValidation.Identity(Convert.ToString(newCustomer.GetValueOrDefault("IdentityNumber")));
+                var address = CustomerValidation.Address(Convert.ToString(newCustomer.GetValueOrDefault("Address")));
+                EnsureCustomerIdentityAvailable(c, t, identity, null);
                 customerId = Database.Scalar<int>(c, t, "INSERT Customers(FullName,Phone,IdentityNumber,Address) OUTPUT INSERTED.Id VALUES(@name,@phone,@identity,@address)",
                     ("@name", name), ("@phone", phone), ("@identity", identity.Length == 0 ? null : identity), ("@address", address));
                 Audit(c, t, user, "Lưu danh mục", $"Customers #{customerId}");
@@ -256,6 +269,7 @@ public sealed partial class HotelService
             Authorize(c, t, user);
             var b = RequireBooking(c, t, id, "Đang ở");
             ValidateDates(b.Field<DateTime>("Arrival"), departure);
+            ValidateHourlyDuration(b.Field<string>("RentalType"), b.Field<DateTime>("ActualCheckIn"), departure);
             var now = DateTime.Now;
             if (departure <= now)
                 throw new ArgumentException("Ngày đi mới phải ở tương lai.");

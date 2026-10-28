@@ -29,8 +29,6 @@ internal static class Program
             if (args.Contains("--initialize"))
             {
                 service.Initialize();
-
-            service.EnsureDemoData();
                 return;
             }
 

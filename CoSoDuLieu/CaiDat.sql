@@ -1,4 +1,4 @@
--- Chay toan bo trong SQL Server Management Studio.
+﻿-- Chay toan bo trong SQL Server Management Studio.
 -- Tao database rieng, khong xoa du lieu da co.
 USE master;
 GO
@@ -76,6 +76,7 @@ CREATE TABLE dbo.Bookings(
  Deposit decimal(18,0) NOT NULL DEFAULT 0 CHECK(Deposit>=0), RefundedDeposit decimal(18,0) NOT NULL DEFAULT 0 CHECK(RefundedDeposit>=0),
  Status nvarchar(20) NOT NULL DEFAULT N'Đã đặt' CHECK(Status IN(N'Đã đặt',N'Đang ở',N'Đã trả',N'Đã hủy')),
  ActualCheckIn datetime2 NULL, ActualCheckOut datetime2 NULL, Notes nvarchar(1000) NOT NULL DEFAULT N'', CreatedAt datetime2 NOT NULL DEFAULT SYSDATETIME(),
+ RentalType nvarchar(20) NOT NULL DEFAULT N'Theo ngày' CHECK(RentalType IN(N'Theo ngày',N'Theo giờ')),
  CONSTRAINT CK_BookingDates CHECK(Departure>Arrival));
 CREATE TABLE dbo.BookingRooms(
  BookingId int NOT NULL REFERENCES dbo.Bookings(Id), RoomId int NOT NULL REFERENCES dbo.Rooms(Id),
@@ -124,6 +125,13 @@ CREATE INDEX IX_RoomUpgrades_Stay ON dbo.RoomUpgrades(StayId,Id);
 END
 IF NOT EXISTS(SELECT 1 FROM dbo.SchemaInfo WHERE Version=2)
  INSERT dbo.SchemaInfo(Version) VALUES(2);
+GO
+-- Add rental mode for databases created before hourly bookings were introduced.
+IF COL_LENGTH(N'dbo.Bookings',N'RentalType') IS NULL
+BEGIN
+ EXEC('ALTER TABLE dbo.Bookings ADD RentalType nvarchar(20) NOT NULL CONSTRAINT DF_Bookings_RentalType DEFAULT N''Theo ngày''');
+ EXEC('ALTER TABLE dbo.Bookings ADD CONSTRAINT CK_Bookings_RentalType CHECK(RentalType IN(N''Theo ngày'',N''Theo giờ''))');
+END
 GO
 CREATE OR ALTER TRIGGER dbo.TR_RoomUpgrades_Immutable ON dbo.RoomUpgrades INSTEAD OF UPDATE, DELETE AS
 BEGIN
