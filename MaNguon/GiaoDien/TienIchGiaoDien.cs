@@ -103,7 +103,7 @@ internal static class Ui
     public static void Info(string message) => MessageBox.Show(message, "Thông tin", MessageBoxButtons.OK, MessageBoxIcon.Information);
     public static DataGridView Grid()
     {
-        var grid = new DataGridView
+        var grid = new LuoiDuLieu
         {
             Dock = DockStyle.Fill,
             BackgroundColor = Color.White,
@@ -111,7 +111,7 @@ internal static class Ui
             ReadOnly = true,
             AllowUserToAddRows = false,
             AllowUserToDeleteRows = false,
-            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.DisplayedCells,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
             MultiSelect = false,
             RowHeadersVisible = false,
@@ -151,7 +151,16 @@ internal static class Ui
             }
             if (col.ValueType == typeof(DateTime))
                 col.DefaultCellStyle.Format = "dd/MM/yyyy HH:mm";
-            col.MinimumWidth = 60;
+            col.MinimumWidth = 80;
+        }
+        grid.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.AllCells);
+        foreach (DataGridViewColumn col in grid.Columns)
+        {
+            if (col.Visible)
+            {
+                if (col.Width < 80) col.Width = 80;
+                col.Width += 16;
+            }
         }
     }
     public static int SelectedId(DataGridView grid) => grid.CurrentRow is { IsNewRow: false } row ? Convert.ToInt32(row.Cells["Id"].Value) : throw new InvalidOperationException("Hãy chọn một dòng trong danh sách.");
@@ -183,6 +192,20 @@ internal static class Ui
         p.Controls.Add(grid);
         p.Controls.Add(bar);
         return p;
+    }
+}
+
+internal sealed class LuoiDuLieu : DataGridView
+{
+    public LuoiDuLieu()
+    {
+        DoubleBuffered = true;
+        SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);
+    }
+    protected override void OnScroll(ScrollEventArgs se)
+    {
+        base.OnScroll(se);
+        Invalidate();
     }
 }
 
