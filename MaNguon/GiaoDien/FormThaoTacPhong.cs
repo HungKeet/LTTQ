@@ -11,7 +11,7 @@ internal sealed class RoomActionsForm : Form
     private readonly AppSettings settings;
     private readonly int roomId;
     private readonly Label heading = new() { Dock = DockStyle.Top, Height = 68, Font = new Font("Segoe UI", 16, FontStyle.Bold), Padding = new Padding(20, 16, 20, 12), TextAlign = ContentAlignment.MiddleLeft };
-    private readonly Label details = new() { Dock = DockStyle.Top, Height = 180, Padding = new Padding(20, 14, 20, 12), BackColor = Color.White, ForeColor = Ui.DarkText };
+    private readonly Label details = new() { Dock = DockStyle.Top, Height = 180, Padding = new Padding(20, 14, 20, 12), BackColor = Color.White, ForeColor = Ui.DarkText, UseMnemonic = false };
     private readonly FlowLayoutPanel actions = new() { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(14, 4, 14, 12), WrapContents = true };
     private string displayedStatus = "";
     private int? displayedBooking;
@@ -90,7 +90,7 @@ internal sealed class RoomActionsForm : Form
                 ? $"Khách đang ở: {row["Khách đang ở"]}\nPhiếu lưu trú: #{displayedBooking}\nDự kiến trả: {row.Field<DateTime>("Dự kiến trả"):dd/MM/yyyy HH:mm}"
                 : displayedStatus switch
                 {
-                    "Sẵn sàng" => "Chọn Đặt phòng hoặc Nhận phòng nhanh. Phòng này được chọn sẵn trong biểu mẫu; lịch trống sẽ được kiểm tra theo thời gian bạn nhập.",
+                    "Sẵn sàng" => "Nhận phòng nhanh dành cho khách đến tại quầy; phòng này sẽ được chọn sẵn để nhận ngay.\nĐể đặt phòng trước theo ngày ở, chọn Đặt phòng & lưu trú trong menu bên trái.",
                     "Chờ dọn" => "Phòng cần được dọn xong trước khi nhận khách mới. Xác nhận sau khi nhân viên đã hoàn tất dọn phòng.",
                     _ => "Phòng đang bảo trì và chưa thể nhận khách. Quản lý có thể cập nhật tình trạng phòng sau khi hoàn tất bảo trì."
                 });
@@ -105,8 +105,7 @@ internal sealed class RoomActionsForm : Form
             }
             if (displayedStatus == "Sẵn sàng")
             {
-                AddAction("BookRoom", "Đặt phòng", () => OpenBooking(false), true);
-                AddAction("WalkIn", "Nhận phòng nhanh", () => OpenBooking(true), true);
+                AddAction("WalkIn", "Nhận phòng nhanh", OpenWalkIn, true);
             }
             else if (displayedStatus == "Đang ở")
             {
@@ -114,6 +113,7 @@ internal sealed class RoomActionsForm : Form
                 AddAction("ChangeRoom", "Đổi phòng", () => OpenStay((id) => new ChangeRoomForm(service, user, id)));
                 AddAction("ChangeDeparture", "Đổi ngày đi", () => OpenStay((id) => new DepartureForm(service, user, id)));
                 AddAction("Checkout", "Trả / thanh toán", () => OpenStay((id) => new CheckoutForm(service, user, settings, id)), true);
+                AddAction("UpgradeRoom", "Nâng cấp phòng", () => OpenStay((id) => new UpgradeRoomForm(service, user, id, roomId)));
             }
             else if (displayedStatus == "Chờ dọn")
             {
@@ -127,7 +127,7 @@ internal sealed class RoomActionsForm : Form
                     Close();
                 }, true);
             }
-            if (user.Role == "Quản lý")
+            if (user.Role == "Quản lý" && displayedStatus != "Đang ở")
                 AddAction("EditRoom", "Quản lý phòng", () =>
                 {
                     RequireCurrent(displayedStatus);
@@ -144,10 +144,10 @@ internal sealed class RoomActionsForm : Form
         finally { actions.ResumeLayout(); }
     }
 
-    private void OpenBooking(bool walkIn)
+    private void OpenWalkIn()
     {
         RequireCurrent("Sẵn sàng");
-        using var editor = new BookingEditor(service, user, null, walkIn, roomId);
+        using var editor = new BookingEditor(service, user, null, true, roomId);
         if (editor.ShowDialog(this) == DialogResult.OK)
         {
             DialogResult = DialogResult.OK;

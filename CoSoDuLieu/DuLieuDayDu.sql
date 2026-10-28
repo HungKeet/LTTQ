@@ -2,15 +2,25 @@
 -- Thoi diem xuat: 2026-10-27 18:08:42
 USE HotelManagementBTL;
 GO
+-- Legacy data snapshot: refuse to overwrite existing paid room upgrade history.
+SET XACT_ABORT ON;
+DECLARE @ActiveIdentity sysname = NULL;
+BEGIN TRY
+BEGIN TRANSACTION;
+DECLARE @LockResult int;
+EXEC @LockResult=sys.sp_getapplock @Resource=N'HotelBTL.Write', @LockMode='Exclusive', @LockOwner='Transaction', @LockTimeout=10000;
+IF @LockResult<0 THROW 51010, N'Hotel is busy; retry the import later.', 1;
+DECLARE @HasUpgrades bit = 0;
+IF OBJECT_ID(N'dbo.RoomUpgrades') IS NOT NULL
+    EXEC sys.sp_executesql N'IF EXISTS(SELECT 1 FROM dbo.RoomUpgrades WITH(HOLDLOCK)) SET @found=1;', N'@found bit OUTPUT', @found=@HasUpgrades OUTPUT;
+IF @HasUpgrades=1
+    THROW 51012, N'Target contains paid room upgrades. Import this legacy snapshot into a fresh initialized database or restore a full database backup; existing upgrade history will not be erased.', 1;
 SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
 SET XACT_ABORT ON;
-BEGIN TRANSACTION;
-GO
 -- Vo hieu hoa trigger bat bien de nap du lieu
 IF OBJECT_ID('dbo.TR_Invoices_Immutable') IS NOT NULL DISABLE TRIGGER dbo.TR_Invoices_Immutable ON dbo.Invoices;
 IF OBJECT_ID('dbo.TR_InvoiceLines_Immutable') IS NOT NULL DISABLE TRIGGER dbo.TR_InvoiceLines_Immutable ON dbo.InvoiceLines;
-GO
 -- Xoa du lieu cu de nap du lieu day du
 DELETE FROM AuditLog;
 DELETE FROM InvoiceLines;
@@ -24,18 +34,19 @@ DELETE FROM Employees;
 DELETE FROM Customers;
 DELETE FROM Rooms;
 DELETE FROM RoomTypes;
-GO
 -- Table: RoomTypes (4 dong)
 SET IDENTITY_INSERT [RoomTypes] ON;
+SET @ActiveIdentity=N'RoomTypes';
 INSERT INTO [RoomTypes] ([Id],[Name],[Capacity],[Rate],[Active]) VALUES
 (1,N'Phòng đơn',2,450000,1),
 (2,N'Phòng đôi',4,700000,1),
 (3,N'Phòng gia đình',6,1000000,1),
 (4,N'President Room',10,3000000,1);
 SET IDENTITY_INSERT [RoomTypes] OFF;
-GO
+SET @ActiveIdentity=NULL;
 -- Table: Rooms (23 dong)
 SET IDENTITY_INSERT [Rooms] ON;
+SET @ActiveIdentity=N'Rooms';
 INSERT INTO [Rooms] ([Id],[Number],[Floor],[RoomTypeId],[OperationalStatus],[Active]) VALUES
 (1,N'101',1,1,N'Sẵn sàng',1),
 (2,N'102',1,2,N'Chờ dọn',1),
@@ -61,9 +72,10 @@ INSERT INTO [Rooms] ([Id],[Number],[Floor],[RoomTypeId],[OperationalStatus],[Act
 (37,N'502',5,3,N'Chờ dọn',1),
 (38,N'503',5,4,N'Sẵn sàng',1);
 SET IDENTITY_INSERT [Rooms] OFF;
-GO
+SET @ActiveIdentity=NULL;
 -- Table: Customers (53 dong)
 SET IDENTITY_INSERT [Customers] ON;
+SET @ActiveIdentity=N'Customers';
 INSERT INTO [Customers] ([Id],[FullName],[Phone],[IdentityNumber],[Address],[Active]) VALUES
 (1,N'Trần Đình Trí',N'0900000001',N'DEMO001',N'Hà Nội',1),
 (2,N'Phạm Thu Hà',N'0900000002',N'DEMO002',N'Đà Nẵng',1),
@@ -119,34 +131,38 @@ INSERT INTO [Customers] ([Id],[FullName],[Phone],[IdentityNumber],[Address],[Act
 (52,N'Đỗ Phương Thảo',N'0912345049',N'001200001049',N'Bạc Liêu',1),
 (53,N'Cù Huy Hoàng',N'0912345050',N'001200001050',N'Cà Mau',1);
 SET IDENTITY_INSERT [Customers] OFF;
-GO
+SET @ActiveIdentity=NULL;
 -- Table: Employees (3 dong)
 SET IDENTITY_INSERT [Employees] ON;
+SET @ActiveIdentity=N'Employees';
 INSERT INTO [Employees] ([Id],[FullName],[Phone],[Position],[Active]) VALUES
 (1,N'Quản lý',N'0900000010',N'Quản lý',1),
 (2,N'Lễ tân',N'0900000011',N'Lễ tân',1),
 (4,N'hunghuy',N'0398870266',N'Quản lý buồng phòng',1);
 SET IDENTITY_INSERT [Employees] OFF;
-GO
+SET @ActiveIdentity=NULL;
 -- Table: Users (3 dong)
 SET IDENTITY_INSERT [Users] ON;
+SET @ActiveIdentity=N'Users';
 INSERT INTO [Users] ([Id],[EmployeeId],[Username],[PasswordHash],[Role],[Active]) VALUES
 (1,1,N'admin',N'210000.BuMVJjuZro6p/nCLaM/zYw==./U9EvJmbXjmWQSFpb5KfhOreP+36AWeZPDsaTA5OgNw=',N'Quản lý',1),
 (2,2,N'letan',N'210000.7/bbbH1gpS+h2ijGg4Ly9Q==.z9MCnN2fejcpMW5MeIk/dEY0VQ2BpkALqVPirzHorew=',N'Lễ tân',1),
 (6,4,N'hunghuy',N'210000.Q7LEeG73hCdRzYCBTsxuCA==.xB9EDLPIhBWYhCd5490SfJNSvQXWfidzperLhn629dA=',N'Quản lý buồng phòng',1);
 SET IDENTITY_INSERT [Users] OFF;
-GO
+SET @ActiveIdentity=NULL;
 -- Table: Services (4 dong)
 SET IDENTITY_INSERT [Services] ON;
+SET @ActiveIdentity=N'Services';
 INSERT INTO [Services] ([Id],[Name],[Unit],[Price],[Active]) VALUES
 (1,N'Nước suối',N'Chai',10000,1),
 (2,N'Giặt là',N'Kg',40000,1),
 (3,N'Ăn sáng',N'Suất',70000,1),
 (4,N'Thuê xe máy',N'Ngày',150000,1);
 SET IDENTITY_INSERT [Services] OFF;
-GO
+SET @ActiveIdentity=NULL;
 -- Table: Bookings (20 dong)
 SET IDENTITY_INSERT [Bookings] ON;
+SET @ActiveIdentity=N'Bookings';
 INSERT INTO [Bookings] ([Id],[CustomerId],[EmployeeId],[Arrival],[Departure],[Guests],[Deposit],[RefundedDeposit],[Status],[ActualCheckIn],[ActualCheckOut],[Notes],[CreatedAt]) VALUES
 (1,1,1,'2026-10-23 16:43:47.4579084','2026-10-25 16:43:47.4579084',2,300000,0,N'Đã trả','2026-10-23 16:43:47.4579084','2026-10-25 16:43:47.4579084',N'Khách mẫu đặt trước','2026-10-23 16:43:47.4579084'),
 (2,2,1,'2026-10-24 16:43:47.4614215','2026-10-25 16:43:47.4614215',2,500000,0,N'Đã trả','2026-10-24 16:43:47.4614215','2026-10-25 16:43:47.4614215',N'Khách công tác','2026-10-24 16:43:47.4614215'),
@@ -169,7 +185,7 @@ INSERT INTO [Bookings] ([Id],[CustomerId],[EmployeeId],[Arrival],[Departure],[Gu
 (27,43,1,'2026-10-26 14:00:00.0000000','2026-11-01 12:00:00.0000000',5,0,0,N'Đang ở','2026-10-26 10:54:59.9366667',NULL,N'','2026-10-26 10:39:49.0154692'),
 (28,8,1,'2026-10-26 14:00:00.0000000','2026-10-27 12:00:00.0000000',6,0,0,N'Đã trả','2026-10-26 10:41:06.6966667','2026-10-26 10:42:06.0333333',N'','2026-10-26 10:41:02.7606790');
 SET IDENTITY_INSERT [Bookings] OFF;
-GO
+SET @ActiveIdentity=NULL;
 -- Table: BookingRooms (21 dong)
 INSERT INTO [BookingRooms] ([BookingId],[RoomId],[NightlyRate],[Capacity]) VALUES
 (1,1,450000,2),
@@ -193,9 +209,9 @@ INSERT INTO [BookingRooms] ([BookingId],[RoomId],[NightlyRate],[Capacity]) VALUE
 (27,4,700000,4),
 (27,38,3000000,10),
 (28,37,1000000,6);
-GO
 -- Table: ServiceUsages (22 dong)
 SET IDENTITY_INSERT [ServiceUsages] ON;
+SET @ActiveIdentity=N'ServiceUsages';
 INSERT INTO [ServiceUsages] ([Id],[BookingId],[ServiceId],[ServiceName],[Unit],[Quantity],[UnitPrice],[UsedAt]) VALUES
 (1,1,1,N'Nước suối',N'Chai',2,10000,'2026-10-24 16:43:47.4599079'),
 (2,1,3,N'Ăn sáng',N'Suất',2,70000,'2026-10-24 16:43:47.4599079'),
@@ -220,9 +236,10 @@ INSERT INTO [ServiceUsages] ([Id],[BookingId],[ServiceId],[ServiceName],[Unit],[
 (29,26,3,N'Ăn sáng',N'Suất',1,70000,'2026-10-25 23:22:41.1722176'),
 (31,26,2,N'Giặt là',N'Kg',2,40000,'2026-10-25 23:22:50.5087099');
 SET IDENTITY_INSERT [ServiceUsages] OFF;
-GO
+SET @ActiveIdentity=NULL;
 -- Table: Invoices (15 dong)
 SET IDENTITY_INSERT [Invoices] ON;
+SET @ActiveIdentity=N'Invoices';
 INSERT INTO [Invoices] ([Id],[BookingId],[EmployeeId],[CustomerName],[CustomerPhone],[CustomerIdentity],[CustomerAddress],[EmployeeName],[IssuedAt],[CheckIn],[CheckOut],[Surcharge],[Discount],[Deposit],[Total],[PaymentMethod],[Notes]) VALUES
 (1,1,1,N'Nguyễn Văn An (mẫu)',N'0900000001',N'DEMO001',N'Hà Nội',N'Quản lý mẫu','2026-10-25 16:43:47.4599079','2026-10-23 16:43:47.4599079','2026-10-25 16:43:47.4599079',50000,0,300000,1110000,N'Chuyển khoản',N'Đã thanh toán đủ'),
 (2,2,1,N'Trần Thị Bình (mẫu)',N'0900000002',N'DEMO002',N'Đà Nẵng',N'Quản lý mẫu','2026-10-25 16:43:47.4624332','2026-10-24 16:43:47.4624332','2026-10-25 16:43:47.4624332',0,50000,500000,780000,N'Tiền mặt',N'Khách thanh toán tiền mặt'),
@@ -240,9 +257,10 @@ INSERT INTO [Invoices] ([Id],[BookingId],[EmployeeId],[CustomerName],[CustomerPh
 (14,26,2,N'Bạch Thảo Nhi',N'0912345040',N'001200001040',N'Đắk Nông',N'Lễ tân','2026-10-25 23:23:22.5971272','2026-10-25 23:22:25.1000000','2026-10-25 23:23:22.5766667',0,0,0,850000,N'Tiền mặt',N''),
 (15,28,1,N'Bùi Thu Thảo',N'0912345005',N'001200001005',N'Cần Thơ',N'Quản lý','2026-10-26 10:42:06.0447079','2026-10-26 10:41:06.6966667','2026-10-26 10:42:06.0333333',0,0,0,1000000,N'Tiền mặt',N'');
 SET IDENTITY_INSERT [Invoices] OFF;
-GO
+SET @ActiveIdentity=NULL;
 -- Table: InvoiceLines (33 dong)
 SET IDENTITY_INSERT [InvoiceLines] ON;
+SET @ActiveIdentity=N'InvoiceLines';
 INSERT INTO [InvoiceLines] ([Id],[InvoiceId],[Kind],[Description],[Quantity],[Unit],[UnitPrice]) VALUES
 (1,1,N'Phòng',N'Phòng 101',2,N'Đêm',450000),
 (2,1,N'Dịch vụ',N'Nước suối',2,N'Chai',10000),
@@ -278,9 +296,10 @@ INSERT INTO [InvoiceLines] ([Id],[InvoiceId],[Kind],[Description],[Quantity],[Un
 (32,14,N'Dịch vụ',N'Giặt là',2,N'Kg',40000),
 (33,15,N'Phòng',N'Phòng 502',1,N'Đêm',1000000);
 SET IDENTITY_INSERT [InvoiceLines] OFF;
-GO
+SET @ActiveIdentity=NULL;
 -- Table: AuditLog (40 dong)
 SET IDENTITY_INSERT [AuditLog] ON;
+SET @ActiveIdentity=N'AuditLog';
 INSERT INTO [AuditLog] ([Id],[UserId],[Action],[Detail],[CreatedAt]) VALUES
 (1,1,N'Hoàn tất dọn phòng',N'Phòng #2','2026-10-25 19:11:45.7311684'),
 (2,1,N'Lưu danh mục',N'Rooms #2','2026-10-25 19:19:40.7497741'),
@@ -323,12 +342,20 @@ INSERT INTO [AuditLog] ([Id],[UserId],[Action],[Detail],[CreatedAt]) VALUES
 (39,1,N'Sửa đặt phòng',N'Phiếu #27; cọc 0','2026-10-26 10:54:50.4131188'),
 (40,1,N'Nhận phòng',N'Phiếu #27','2026-10-26 10:54:59.9422605');
 SET IDENTITY_INSERT [AuditLog] OFF;
-GO
+SET @ActiveIdentity=NULL;
 -- Bat lai trigger bao ve hoa don
 IF OBJECT_ID('dbo.TR_Invoices_Immutable') IS NOT NULL ENABLE TRIGGER dbo.TR_Invoices_Immutable ON dbo.Invoices;
 IF OBJECT_ID('dbo.TR_InvoiceLines_Immutable') IS NOT NULL ENABLE TRIGGER dbo.TR_InvoiceLines_Immutable ON dbo.InvoiceLines;
-GO
 COMMIT TRANSACTION;
-GO
+END TRY
+BEGIN CATCH
+    IF XACT_STATE()<>0 ROLLBACK TRANSACTION;
+    IF @ActiveIdentity IS NOT NULL
+    BEGIN
+        DECLARE @IdentityOff nvarchar(300)=N'SET IDENTITY_INSERT dbo.' + QUOTENAME(@ActiveIdentity) + N' OFF;';
+        EXEC(@IdentityOff);
+    END;
+    THROW;
+END CATCH;
 PRINT N'Da nap thanh cong toan bo du lieu tu may cuc bo!';
 GO

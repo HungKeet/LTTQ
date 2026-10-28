@@ -9,7 +9,7 @@ public sealed partial class HotelService
 {
     private const string ConflictCondition = """
         (((CASE WHEN b.Status=N'Đang ở' THEN COALESCE(b.ActualCheckIn,b.Arrival) ELSE b.Arrival END)<@to AND b.Departure>@from)
-        OR (b.Status=N'Đang ở' AND b.Departure<=SYSDATETIME() AND @from<=SYSDATETIME()))
+        OR (b.Status=N'Đang ở' AND b.Departure<=@now AND @from<=@now))
         """;
     private const string ConflictSql = """
         SELECT COUNT(*) FROM BookingRooms br JOIN Bookings b ON b.Id=br.BookingId
@@ -34,6 +34,7 @@ public sealed partial class HotelService
         ValidateDates(from, to);
         using var c = db.Open();
         Authorize(c, null, user);
+        var now = DateTime.Now;
         return Database.Query(c, null, $"""
             SELECT r.Id,r.Number AS [Số phòng],t.Name AS [Loại phòng],r.Floor AS [Tầng],t.Capacity AS [Sức chứa],t.Rate AS [Giá / đêm]
             FROM Rooms r JOIN RoomTypes t ON t.Id=r.RoomTypeId
@@ -44,7 +45,7 @@ public sealed partial class HotelService
             AND NOT EXISTS(SELECT 1 FROM BookingRooms br JOIN Bookings b ON b.Id=br.BookingId WHERE br.RoomId=r.Id AND b.Id<>@exclude AND b.Status IN(N'Đã đặt',N'Đang ở')
             AND {ConflictCondition})
             ORDER BY r.Number
-            """, ("@from", from), ("@to", to), ("@exclude", excludeBooking), ("@ready", readyOnly));
+            """, ("@from", from), ("@to", to), ("@exclude", excludeBooking), ("@ready", readyOnly), ("@now", now));
     }
     private static void ValidateDates(DateTime from, DateTime to)
     {
@@ -58,8 +59,9 @@ public sealed partial class HotelService
 
     private static int SaveBooking(SqlConnection c, SqlTransaction t, Session user, BookingInput input, int? bookingId = null)
     {
+        var now = DateTime.Now;
         ValidateDates(input.Arrival, input.Departure);
-        if (input.Arrival.Date < DateTime.Today)
+        if (input.Arrival.Date < now.Date)
             throw new ArgumentException("Ngày đến không được trước hôm nay.");
         if (input.RoomIds.Count == 0 || input.RoomIds.Distinct().Count() != input.RoomIds.Count)
             throw new ArgumentException("Cần chọn ít nhất một phòng; không chọn phòng trùng.");
@@ -79,7 +81,7 @@ public sealed partial class HotelService
         foreach (var roomId in input.RoomIds.Order())
         {
             var room = Single(Database.Query(c, t, "SELECT r.Number,t.Rate,t.Capacity FROM Rooms r JOIN RoomTypes t ON t.Id=r.RoomTypeId WHERE r.Id=@id AND r.Active=1 AND t.Active=1 AND r.OperationalStatus<>N'Bảo trì'", ("@id", roomId)));
-            if (Database.Scalar<int>(c, t, ConflictSql, ("@room", roomId), ("@exclude", bookingId ?? 0), ("@from", input.Arrival), ("@to", input.Departure)) > 0)
+            if (Database.Scalar<int>(c, t, ConflictSql, ("@room", roomId), ("@exclude", bookingId ?? 0), ("@from", input.Arrival), ("@to", input.Departure), ("@now", now)) > 0)
                 throw new InvalidOperationException($"Phòng {room["Number"]} đã có khách đặt/đang ở trong thời gian này. Hãy tìm phòng lại.");
             var snapshot = prior.GetValueOrDefault(roomId, (Rate: room.Field<decimal>("Rate"), Capacity: room.Field<int>("Capacity")));
             rooms.Add((roomId, snapshot.Rate, snapshot.Capacity));
@@ -118,7 +120,12 @@ public sealed partial class HotelService
     {
         using var c = db.Open();
         Authorize(c, null, user);
-        return Database.Query(c, null, "SELECT br.RoomId AS Id,r.Number AS [Số phòng],br.NightlyRate AS [Giá / đêm],br.Capacity AS [Sức chứa] FROM BookingRooms br JOIN Rooms r ON r.Id=br.RoomId WHERE br.BookingId=@id ORDER BY r.Number", ("@id", id));
+        return Database.Query(c, null, """
+            SELECT br.RoomId AS Id,r.Number AS [Số phòng],br.NightlyRate+
+                COALESCE((SELECT SUM(u.NewNightlyRate-u.OldNightlyRate) FROM RoomUpgrades u WHERE u.StayId=br.StayId),0) AS [Giá / đêm],
+                br.Capacity AS [Sức chứa]
+            FROM BookingRooms br JOIN Rooms r ON r.Id=br.RoomId WHERE br.BookingId=@id ORDER BY r.Number
+            """, ("@id", id));
     }
     public DataTable Bookings(Session user, string search = "", string status = "Tất cả", int? customerId = null)
     {
@@ -166,7 +173,7 @@ public sealed partial class HotelService
             var occupied = Database.Scalar<int>(c, t, "SELECT COUNT(*) FROM BookingRooms br JOIN Bookings b ON b.Id=br.BookingId WHERE br.RoomId=@room AND b.Status=N'Đang ở'", ("@room", r["Id"]));
             if (occupied > 0)
                 throw new InvalidOperationException($"Phòng {r["Number"]} vẫn đang có khách.");
-            if (Database.Scalar<int>(c, t, ConflictSql, ("@room", r["Id"]), ("@exclude", id), ("@from", now), ("@to", b["Departure"])) > 0)
+            if (Database.Scalar<int>(c, t, ConflictSql, ("@room", r["Id"]), ("@exclude", id), ("@from", now), ("@to", b["Departure"]), ("@now", now)) > 0)
                 throw new InvalidOperationException("Thời gian nhận thực tế trùng phiếu đặt khác.");
         }
         Database.Execute(c, t, "UPDATE Bookings SET Status=N'Đang ở',ActualCheckIn=@now WHERE Id=@id", ("@now", now), ("@id", id));
@@ -219,13 +226,17 @@ public sealed partial class HotelService
             var now = DateTime.Now;
             if (b.Field<DateTime>("Departure") <= now)
                 throw new InvalidOperationException("Phiếu đã quá giờ trả dự kiến. Hãy đổi ngày đi trước khi đổi phòng.");
-            var oldRoom = Single(Database.Query(c, t, "SELECT br.NightlyRate,r.Number FROM BookingRooms br JOIN Rooms r ON r.Id=br.RoomId WHERE br.BookingId=@b AND br.RoomId=@old", ("@b", bookingId), ("@old", oldRoomId)));
+            var oldRoom = Single(Database.Query(c, t, """
+                SELECT br.NightlyRate+
+                    COALESCE((SELECT SUM(u.NewNightlyRate-u.OldNightlyRate) FROM RoomUpgrades u WHERE u.StayId=br.StayId),0) AS NightlyRate,r.Number
+                FROM BookingRooms br JOIN Rooms r ON r.Id=br.RoomId WHERE br.BookingId=@b AND br.RoomId=@old
+                """, ("@b", bookingId), ("@old", oldRoomId)));
             var target = Single(Database.Query(c, t, "SELECT r.Number,r.OperationalStatus,r.Active,t.Active AS TypeActive,t.Capacity FROM Rooms r JOIN RoomTypes t ON t.Id=r.RoomTypeId WHERE r.Id=@new", ("@new", newRoomId)));
             if (!target.Field<bool>("Active") || !target.Field<bool>("TypeActive") || target.Field<string>("OperationalStatus") != "Sẵn sàng")
                 throw new InvalidOperationException("Phòng mới phải đang hoạt động và sẵn sàng nhận khách.");
             if (Database.Scalar<int>(c, t, "SELECT COUNT(*) FROM BookingRooms br JOIN Bookings b ON b.Id=br.BookingId WHERE br.RoomId=@new AND b.Status=N'Đang ở'", ("@new", newRoomId)) > 0)
                 throw new InvalidOperationException("Phòng mới vẫn đang có khách.");
-            if (Database.Scalar<int>(c, t, ConflictSql, ("@room", newRoomId), ("@exclude", bookingId), ("@from", now), ("@to", b["Departure"])) > 0)
+            if (Database.Scalar<int>(c, t, ConflictSql, ("@room", newRoomId), ("@exclude", bookingId), ("@from", now), ("@to", b["Departure"]), ("@now", now)) > 0)
                 throw new InvalidOperationException("Phòng mới trùng lịch đặt trong thời gian lưu trú còn lại.");
             var capacity = target.Field<int>("Capacity");
             var otherCapacity = Database.Scalar<int>(c, t, "SELECT COALESCE(SUM(Capacity),0) FROM BookingRooms WHERE BookingId=@b AND RoomId<>@old", ("@b", bookingId), ("@old", oldRoomId));
@@ -249,7 +260,7 @@ public sealed partial class HotelService
             if (departure <= now)
                 throw new ArgumentException("Ngày đi mới phải ở tương lai.");
             foreach (DataRow r in Database.Query(c, t, "SELECT RoomId FROM BookingRooms WHERE BookingId=@id", ("@id", id)).Rows)
-                if (Database.Scalar<int>(c, t, ConflictSql, ("@room", r["RoomId"]), ("@exclude", id), ("@from", now), ("@to", departure)) > 0)
+                if (Database.Scalar<int>(c, t, ConflictSql, ("@room", r["RoomId"]), ("@exclude", id), ("@from", now), ("@to", departure), ("@now", now)) > 0)
                     throw new InvalidOperationException("Không thể thay đổi ngày đi vì trùng lịch đặt phòng khác.");
             Database.Execute(c, t, "UPDATE Bookings SET Departure=@d WHERE Id=@id", ("@d", departure), ("@id", id));
             Audit(c, t, user, "Đổi ngày đi", $"Phiếu #{id}: {departure:dd/MM/yyyy HH:mm}");

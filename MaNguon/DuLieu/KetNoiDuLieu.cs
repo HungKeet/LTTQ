@@ -42,7 +42,17 @@ public sealed class Database(string connectionString)
     {
         var command = new SqlCommand(sql, connection, transaction) { CommandTimeout = 30 };
         foreach (var (name, value) in values)
-            command.Parameters.AddWithValue(name, value ?? DBNull.Value);
+        {
+            if (value is DateTime timestamp)
+            {
+                // Match the schema's datetime2 columns without rounding DateTime to SQL datetime's 3 ms increments.
+                var parameter = command.Parameters.Add(name, SqlDbType.DateTime2);
+                parameter.Scale = 7;
+                parameter.Value = timestamp;
+            }
+            else
+                command.Parameters.AddWithValue(name, value ?? DBNull.Value);
+        }
         return command;
     }
     public static DataTable Query(SqlConnection connection, SqlTransaction? transaction, string sql, params (string Name, object? Value)[] values)

@@ -39,6 +39,35 @@ public sealed class StayImprovementsTests(DatabaseFixture fixture) : IClassFixtu
     }
 
     [Fact]
+    public void ImmediateOverdueSearch_RemainsBlockedAcrossRepeatedFastQueries()
+    {
+        var room = f.Room();
+        var stay = f.Stay(room);
+        f.Db.Execute("UPDATE Bookings SET Arrival=@a,ActualCheckIn=@a,Departure=@d WHERE Id=@id",
+            ("@a", DateTime.Today.AddDays(-2)), ("@d", DateTime.Now.AddHours(-1)), ("@id", stay));
+        for (var i = 0; i < 20; i++)
+        {
+            var now = DateTime.Now;
+            Assert.DoesNotContain(f.Service.AvailableRooms(f.Admin, now, now.AddHours(2)).AsEnumerable(), r => r.Field<int>("Id") == room);
+            Assert.Throws<InvalidOperationException>(() => f.Service.SaveBooking(f.Admin,
+                f.Input([room]) with { Arrival = now, Departure = now.AddHours(2) }));
+        }
+        var future = DateTime.Today.AddDays(3);
+        Assert.Contains(f.Service.AvailableRooms(f.Admin, future, future.AddDays(1)).AsEnumerable(), r => r.Field<int>("Id") == room);
+    }
+
+    [Fact]
+    public void DateTimeParameters_PreserveTicksAndMatchSqlDateTime2Columns()
+    {
+        var moment = new DateTime(2026, 10, 27, 19, 1, 2).AddTicks(12345);
+        var row = f.Db.Query("SELECT @at AS Moment,CONVERT(nvarchar(20),SQL_VARIANT_PROPERTY(@at,'BaseType')) AS BaseType,@count AS CountValue",
+            ("@at", moment), ("@count", 7)).Rows[0];
+        Assert.Equal(moment, row.Field<DateTime>("Moment"));
+        Assert.Equal("datetime2", row.Field<string>("BaseType"));
+        Assert.Equal(7, row.Field<int>("CountValue"));
+    }
+
+    [Fact]
     public void SameDayReservations_UseExactTimes_AndAllowAdjacentBookings()
     {
         var room = f.Room();

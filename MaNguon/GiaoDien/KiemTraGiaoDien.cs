@@ -106,6 +106,7 @@ internal static class UiSmoke
             Capture(new ServicesForm(service, reception, active), "09-DichVu");
             Capture(new DepartureForm(service, reception, active), "10-DoiNgayDi");
             Capture(new ChangeRoomForm(service, reception, active), "11-DoiPhong");
+            Capture(new UpgradeRoomForm(service, reception, active, service.BookingRooms(reception, active).Rows[0].Field<int>("Id")), "11b-NangCapPhong");
             Capture(new CheckoutForm(service, reception, smokeSettings, active), "12-ThanhToan");
             Capture(new InvoiceForm(invoice, smokeSettings), "13-HoaDon");
 

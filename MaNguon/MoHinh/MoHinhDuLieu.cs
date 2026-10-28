@@ -2,6 +2,11 @@ namespace Hotel.Core;
 
 public sealed record Session(int UserId, int EmployeeId, string Username, string FullName, string Role);
 public sealed record BookingInput(int CustomerId, DateTime Arrival, DateTime Departure, int Guests, decimal Deposit, string Notes, IReadOnlyList<int> RoomIds);
+public sealed record RoomUpgradeQuote(int BookingId, int StayId, int OldRoomId, int NewRoomId, string OldRoomNumber, string NewRoomNumber, decimal OldRate, decimal NewRate, DateTime Departure, DateTime QuotedAt, int Nights)
+{
+    public decimal Difference => NewRate - OldRate;
+    public decimal Fee => Money.Round(Difference * Nights);
+}
 public sealed record InvoiceLine(string Kind, string Description, decimal Quantity, string Unit, decimal UnitPrice)
 {
     public decimal Amount => Money.Round(Quantity * UnitPrice);

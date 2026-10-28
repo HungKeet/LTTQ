@@ -12,8 +12,25 @@ public sealed partial class HotelService
         var b = RequireBooking(c, t, bookingId, "Đang ở");
         var nights = Money.Nights(b.Field<DateTime>("ActualCheckIn"), checkoutAt);
         var lines = new List<InvoiceLine>();
-        foreach (DataRow room in Database.Query(c, t, "SELECT r.Number,br.NightlyRate FROM BookingRooms br JOIN Rooms r ON r.Id=br.RoomId WHERE br.BookingId=@id ORDER BY r.Number", ("@id", bookingId)).Rows)
-            lines.Add(new InvoiceLine("Phòng", "Phòng " + room["Number"], nights, "Đêm", room.Field<decimal>("NightlyRate")));
+        foreach (DataRow room in Database.Query(c, t, """
+            SELECT r.Number,br.NightlyRate,
+                CASE WHEN EXISTS(SELECT 1 FROM RoomUpgrades u WHERE u.StayId=br.StayId) THEN 1 ELSE 0 END AS HasUpgrade
+            FROM BookingRooms br JOIN Rooms r ON r.Id=br.RoomId WHERE br.BookingId=@id ORDER BY r.Number
+            """, ("@id", bookingId)).Rows)
+            lines.Add(new InvoiceLine("Phòng", "Phòng " + room["Number"] + (room.Field<int>("HasUpgrade") == 1 ? " (giá ban đầu)" : ""), nights, "Đêm", room.Field<decimal>("NightlyRate")));
+        foreach (DataRow upgrade in Database.Query(c, t, """
+            SELECT u.FromRoomNumber,u.ToRoomNumber,u.UpgradedAt,u.NewNightlyRate-u.OldNightlyRate AS Difference
+            FROM RoomUpgrades u JOIN BookingRooms br ON br.StayId=u.StayId
+            WHERE br.BookingId=@id ORDER BY u.Id
+            """, ("@id", bookingId)).Rows)
+        {
+            var upgradedAt = upgrade.Field<DateTime>("UpgradedAt");
+            if (checkoutAt < upgradedAt)
+                throw new InvalidOperationException("Thời điểm trả phòng đang trước lần nâng cấp đã ghi nhận. Hãy kiểm tra giờ hệ thống và tính lại.");
+            lines.Add(new InvoiceLine("Nâng phòng",
+                $"Nâng phòng {upgrade["FromRoomNumber"]} → {upgrade["ToRoomNumber"]} từ {upgradedAt:dd/MM/yyyy}",
+                Money.Nights(upgradedAt, checkoutAt), "Đêm", upgrade.Field<decimal>("Difference")));
+        }
         // Keep price/name snapshots separate while combining repeated uses of the same service.
         foreach (DataRow usage in Database.Query(c, t, """
             SELECT ServiceId,ServiceName,Unit,UnitPrice,SUM(CONVERT(decimal(18,0),Quantity)) AS Quantity
@@ -79,7 +96,7 @@ public sealed partial class HotelService
         Authorize(c, null, user, true);
         return Database.Query(c, null, """
             SELECT CAST(i.IssuedAt AS date) AS [Ngày],COUNT(*) AS [Số hóa đơn],SUM(x.RoomAmount) AS [Tiền phòng],SUM(x.ServiceAmount) AS [Tiền dịch vụ],SUM(i.Surcharge) AS [Phụ thu],SUM(i.Discount) AS [Giảm giá],SUM(i.Total) AS [Doanh thu],SUM(i.Deposit) AS [Cọc đã đối trừ],SUM(i.Total-i.Deposit) AS [Thu thêm / hoàn âm]
-            FROM Invoices i CROSS APPLY(SELECT COALESCE(SUM(CASE WHEN Kind=N'Phòng' THEN Amount ELSE 0 END),0) RoomAmount,COALESCE(SUM(CASE WHEN Kind=N'Dịch vụ' THEN Amount ELSE 0 END),0) ServiceAmount FROM InvoiceLines WHERE InvoiceId=i.Id) x
+            FROM Invoices i CROSS APPLY(SELECT COALESCE(SUM(CASE WHEN Kind IN(N'Phòng',N'Nâng phòng') THEN Amount ELSE 0 END),0) RoomAmount,COALESCE(SUM(CASE WHEN Kind=N'Dịch vụ' THEN Amount ELSE 0 END),0) ServiceAmount FROM InvoiceLines WHERE InvoiceId=i.Id) x
             WHERE i.IssuedAt>=@from AND i.IssuedAt<@to GROUP BY CAST(i.IssuedAt AS date) ORDER BY [Ngày]
             """, ("@from", from.Date), ("@to", to.Date.AddDays(1)));
     }
@@ -91,7 +108,7 @@ public sealed partial class HotelService
         Authorize(c, null, user, true);
         return Database.Query(c, null, """
             SELECT FORMAT(i.IssuedAt, 'MM/yyyy') AS [Tháng],COUNT(*) AS [Số hóa đơn],SUM(x.RoomAmount) AS [Tiền phòng],SUM(x.ServiceAmount) AS [Tiền dịch vụ],SUM(i.Surcharge) AS [Phụ thu],SUM(i.Discount) AS [Giảm giá],SUM(i.Total) AS [Doanh thu],SUM(i.Deposit) AS [Cọc đã đối trừ],SUM(i.Total-i.Deposit) AS [Thu thêm / hoàn âm]
-            FROM Invoices i CROSS APPLY(SELECT COALESCE(SUM(CASE WHEN Kind=N'Phòng' THEN Amount ELSE 0 END),0) RoomAmount,COALESCE(SUM(CASE WHEN Kind=N'Dịch vụ' THEN Amount ELSE 0 END),0) ServiceAmount FROM InvoiceLines WHERE InvoiceId=i.Id) x
+            FROM Invoices i CROSS APPLY(SELECT COALESCE(SUM(CASE WHEN Kind IN(N'Phòng',N'Nâng phòng') THEN Amount ELSE 0 END),0) RoomAmount,COALESCE(SUM(CASE WHEN Kind=N'Dịch vụ' THEN Amount ELSE 0 END),0) ServiceAmount FROM InvoiceLines WHERE InvoiceId=i.Id) x
             WHERE i.IssuedAt>=@from AND i.IssuedAt<@to GROUP BY FORMAT(i.IssuedAt, 'yyyy-MM'), FORMAT(i.IssuedAt, 'MM/yyyy') ORDER BY FORMAT(i.IssuedAt, 'yyyy-MM')
             """, ("@from", from.Date), ("@to", to.Date.AddDays(1)));
     }

@@ -103,6 +103,33 @@ CREATE TABLE dbo.AuditLog(
  Detail nvarchar(1000) NOT NULL, CreatedAt datetime2 NOT NULL DEFAULT SYSDATETIME());
 END
 GO
+-- Paid room upgrade migration
+IF COL_LENGTH(N'dbo.BookingRooms',N'StayId') IS NULL
+ ALTER TABLE dbo.BookingRooms ADD StayId int IDENTITY(1,1) NOT NULL;
+GO
+IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.BookingRooms') AND name=N'UX_BookingRooms_StayId')
+ CREATE UNIQUE INDEX UX_BookingRooms_StayId ON dbo.BookingRooms(StayId);
+GO
+IF OBJECT_ID(N'dbo.RoomUpgrades') IS NULL
+BEGIN
+CREATE TABLE dbo.RoomUpgrades(
+ Id int IDENTITY PRIMARY KEY, StayId int NOT NULL REFERENCES dbo.BookingRooms(StayId),
+ FromRoomId int NOT NULL REFERENCES dbo.Rooms(Id), ToRoomId int NOT NULL REFERENCES dbo.Rooms(Id),
+ FromRoomNumber nvarchar(20) NOT NULL, ToRoomNumber nvarchar(20) NOT NULL,
+ OldNightlyRate decimal(18,0) NOT NULL CHECK(OldNightlyRate>0), NewNightlyRate decimal(18,0) NOT NULL,
+ UpgradedAt datetime2 NOT NULL, EmployeeId int NOT NULL REFERENCES dbo.Employees(Id),
+ CONSTRAINT CK_RoomUpgradeRates CHECK(NewNightlyRate>OldNightlyRate),
+ CONSTRAINT CK_RoomUpgradeRooms CHECK(FromRoomId<>ToRoomId));
+CREATE INDEX IX_RoomUpgrades_Stay ON dbo.RoomUpgrades(StayId,Id);
+END
+IF NOT EXISTS(SELECT 1 FROM dbo.SchemaInfo WHERE Version=2)
+ INSERT dbo.SchemaInfo(Version) VALUES(2);
+GO
+CREATE OR ALTER TRIGGER dbo.TR_RoomUpgrades_Immutable ON dbo.RoomUpgrades INSTEAD OF UPDATE, DELETE AS
+BEGIN
+ THROW 51003, N'Lịch sử nâng cấp phòng không được sửa hoặc xóa.', 1;
+END
+GO
 CREATE OR ALTER TRIGGER dbo.TR_Invoices_Immutable ON dbo.Invoices INSTEAD OF UPDATE, DELETE AS
 BEGIN
  THROW 51001, N'Hóa đơn đã thanh toán không được sửa hoặc xóa.', 1;

@@ -369,7 +369,7 @@ internal static class InvoiceExport
         int stt = 1;
         foreach (var l in invoice.Lines)
         {
-            var tagClass = l.Kind == "Phòng" ? "kind-room" : "kind-svc";
+            var tagClass = l.Kind is "Phòng" or "Nâng phòng" ? "kind-room" : "kind-svc";
             rows.Append($"""
                 <tr>
                     <td style="text-align:center;">{stt++}</td>
