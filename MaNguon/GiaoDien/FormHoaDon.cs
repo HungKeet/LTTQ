@@ -10,7 +10,7 @@ internal sealed class CheckoutForm : Form
 {
     private CheckoutQuote? quote;
     private readonly DataGridView grid = Ui.Grid();
-    private readonly NumericUpDown surcharge = Ui.Number(), discount = Ui.Number();
+    private readonly MoneyBox surcharge = Ui.Money(), discount = Ui.Money();
     private readonly Label summary = new()
     {
         Dock = DockStyle.Bottom,
@@ -77,8 +77,8 @@ internal sealed class CheckoutForm : Form
         }
 
         surcharge.Width = discount.Width = 140;
-        bar.Controls.Add(OperationalLayout.Field("Phụ thu (đ)", surcharge));
-        bar.Controls.Add(OperationalLayout.Field("Giảm trừ (đ)", discount));
+        bar.Controls.Add(OperationalLayout.Field("Phụ thu", surcharge));
+        bar.Controls.Add(OperationalLayout.Field("Giảm trừ", discount));
         bar.Controls.Add(OperationalLayout.Field("Thanh toán", method));
         bar.Controls.Add(Ui.Button("Tính lại", () => Calculate()));
 
