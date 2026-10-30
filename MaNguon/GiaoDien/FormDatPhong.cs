@@ -70,7 +70,7 @@ internal sealed class BookingEditor : Form
 {
     private readonly HotelService service; private readonly Session user; private readonly int? id;
     private readonly bool walkIn;
-    private readonly DataGridView rooms = Ui.Grid(); private readonly ComboBox customer;
+    private readonly DataGridView rooms = Ui.Grid(); private readonly CustomerPicker customer;
     private readonly ComboBox rentalType = Ui.Choices("Theo ngày", "Theo giờ");
     private readonly DateTimePicker arrival = Ui.Date(DateTime.Today.AddHours(14)), departure = Ui.Date(DateTime.Today.AddDays(1).AddHours(12));
     private readonly NumericUpDown guests = Ui.Number(200, 1, 1);
@@ -120,7 +120,7 @@ internal sealed class BookingEditor : Form
             departure.Value = arrival.Value.AddHours(2);
         }
         var b = id.HasValue ? service.Booking(user, id.Value) : null;
-        customer = Ui.Lookup(service.Lookup(user, CatalogKind.Customers), b?.Field<int>("CustomerId"));
+        customer = new CustomerPicker(service.Lookup(user, CatalogKind.Customers), b?.Field<int>("CustomerId"));
         if (b is not null)
         {
             arrival.Value = b.Field<DateTime>("Arrival");
@@ -144,11 +144,11 @@ internal sealed class BookingEditor : Form
             form.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         var line1 = Ui.Toolbar();
         customer.Width = 340;
-        line1.Controls.Add(OperationalLayout.Field("Khách hàng *", customer));
+        line1.Controls.Add(OperationalLayout.Field("Tìm khách hàng *", customer));
         if (walkIn)
             line1.Controls.Add(newCustomer);
         else
-            line1.Controls.Add(Ui.Button("Thêm khách", () => { using var editor = new CatalogEditor(service, user, CatalogKind.Customers); if (editor.ShowDialog(this) == DialogResult.OK) { customer.DataSource = service.Lookup(user, CatalogKind.Customers); customer.SelectedValue = editor.SavedId; } }));
+            line1.Controls.Add(Ui.Button("Thêm khách", () => { using var editor = new CatalogEditor(service, user, CatalogKind.Customers); if (editor.ShowDialog(this) == DialogResult.OK) customer.Reload(service.Lookup(user, CatalogKind.Customers), editor.SavedId); }));
         var customerLine1 = Ui.Toolbar();
         customerLine1.Visible = false;
         Control CustomerInput(TextBox input, Func<string, string> check)
@@ -361,7 +361,7 @@ internal sealed class BookingEditor : Form
         if (!availabilityCurrent)
             throw new InvalidOperationException("Thời gian chưa hợp lệ hoặc chưa tải được danh sách phòng trống.");
         var chosen = ((DataTable)rooms.DataSource!).AsEnumerable().Where(r => r.Field<bool?>("Chọn") == true).Select(r => r.Field<int>("Id")).ToList();
-        var customerId = walkIn && newCustomer.Checked ? 0 : Ui.Value(customer);
+        var customerId = walkIn && newCustomer.Checked ? 0 : customer.SelectedCustomerId();
         var input = new BookingInput(customerId, From, To, (int)guests.Value, deposit.Value, notes.Text, chosen, rentalType.Text);
         Dictionary<string, object?>? details = walkIn && newCustomer.Checked
             ? new() { ["FullName"] = fullName.Text, ["Phone"] = phone.Text, ["IdentityNumber"] = identity.Text, ["Address"] = address.Text }
